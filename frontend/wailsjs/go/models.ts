@@ -96,6 +96,20 @@ export namespace main {
 		    return a;
 		}
 	}
+	export class OperationResult {
+	    success: boolean;
+	    message: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new OperationResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.success = source["success"];
+	        this.message = source["message"];
+	    }
+	}
 	export class QueryECSResult {
 	    success: boolean;
 	    message: string;

@@ -84,6 +84,117 @@ func (s *ECSService) ListInstances(accessKeyId, accessKeySecret, region string) 
 	}, nil
 }
 
+// InstanceDetailAdapter is a provider-agnostic representation of instance details.
+type InstanceDetailAdapter struct {
+	InstanceId         string   `json:"instanceId"`
+	InstanceName       string   `json:"instanceName"`
+	Description        string   `json:"description"`
+	HostName           string   `json:"hostName"`
+	Status             string   `json:"status"`
+	RegionId           string   `json:"regionId"`
+	ZoneId             string   `json:"zoneId"`
+	InstanceType       string   `json:"instanceType"`
+	Cpu                int32    `json:"cpu"`
+	Memory             int32    `json:"memory"`
+	ImageId            string   `json:"imageId"`
+	InternetChargeType string   `json:"internetChargeType"`
+	CreationTime       string   `json:"creationTime"`
+	ExpiredTime        string   `json:"expiredTime"`
+	StoppedMode        string   `json:"stoppedMode"`
+	PublicIp           []string `json:"publicIp"`
+	PrivateIp          []string `json:"privateIp"`
+	SecurityGroupIds   []string `json:"securityGroupIds"`
+}
+
+// GetInstanceDetail queries detailed information for a single ECS instance.
+func (s *ECSService) GetInstanceDetail(accessKeyId, accessKeySecret, region, instanceId string) (*InstanceDetailAdapter, error) {
+	if accessKeyId == "" || accessKeySecret == "" || region == "" || instanceId == "" {
+		return nil, fmt.Errorf("accessKeyId, accessKeySecret, region and instanceId are required")
+	}
+
+	provider, err := aliyun.NewECSProvider(accessKeyId, accessKeySecret, region)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize ECS provider: %s", security.SanitizeErrorMessage(err))
+	}
+
+	detail, err := provider.DescribeInstanceDetail(instanceId)
+	if err != nil {
+		return nil, fmt.Errorf("failed to describe instance: %s", security.SanitizeErrorMessage(err))
+	}
+
+	return &InstanceDetailAdapter{
+		InstanceId:         detail.InstanceId,
+		InstanceName:       detail.InstanceName,
+		Description:        detail.Description,
+		HostName:           detail.HostName,
+		Status:             detail.Status,
+		RegionId:           detail.RegionId,
+		ZoneId:             detail.ZoneId,
+		InstanceType:       detail.InstanceType,
+		Cpu:                detail.Cpu,
+		Memory:             detail.Memory,
+		ImageId:            detail.ImageId,
+		InternetChargeType: detail.InternetChargeType,
+		CreationTime:       detail.CreationTime,
+		ExpiredTime:        detail.ExpiredTime,
+		StoppedMode:        detail.StoppedMode,
+		PublicIp:           detail.PublicIp,
+		PrivateIp:          detail.PrivateIp,
+		SecurityGroupIds:   detail.SecurityGroupIds,
+	}, nil
+}
+
+// StartInstance starts a stopped ECS instance.
+func (s *ECSService) StartInstance(accessKeyId, accessKeySecret, region, instanceId string) error {
+	if accessKeyId == "" || accessKeySecret == "" || region == "" || instanceId == "" {
+		return fmt.Errorf("accessKeyId, accessKeySecret, region and instanceId are required")
+	}
+
+	provider, err := aliyun.NewECSProvider(accessKeyId, accessKeySecret, region)
+	if err != nil {
+		return fmt.Errorf("failed to initialize ECS provider: %s", security.SanitizeErrorMessage(err))
+	}
+
+	if err := provider.StartInstance(instanceId); err != nil {
+		return fmt.Errorf("failed to start instance: %s", security.SanitizeErrorMessage(err))
+	}
+	return nil
+}
+
+// StopInstance stops a running ECS instance.
+func (s *ECSService) StopInstance(accessKeyId, accessKeySecret, region, instanceId string, forceStop bool) error {
+	if accessKeyId == "" || accessKeySecret == "" || region == "" || instanceId == "" {
+		return fmt.Errorf("accessKeyId, accessKeySecret, region and instanceId are required")
+	}
+
+	provider, err := aliyun.NewECSProvider(accessKeyId, accessKeySecret, region)
+	if err != nil {
+		return fmt.Errorf("failed to initialize ECS provider: %s", security.SanitizeErrorMessage(err))
+	}
+
+	if err := provider.StopInstance(instanceId, forceStop); err != nil {
+		return fmt.Errorf("failed to stop instance: %s", security.SanitizeErrorMessage(err))
+	}
+	return nil
+}
+
+// RebootInstance reboots an ECS instance.
+func (s *ECSService) RebootInstance(accessKeyId, accessKeySecret, region, instanceId string, forceStop bool) error {
+	if accessKeyId == "" || accessKeySecret == "" || region == "" || instanceId == "" {
+		return fmt.Errorf("accessKeyId, accessKeySecret, region and instanceId are required")
+	}
+
+	provider, err := aliyun.NewECSProvider(accessKeyId, accessKeySecret, region)
+	if err != nil {
+		return fmt.Errorf("failed to initialize ECS provider: %s", security.SanitizeErrorMessage(err))
+	}
+
+	if err := provider.RebootInstance(instanceId, forceStop); err != nil {
+		return fmt.Errorf("failed to reboot instance: %s", security.SanitizeErrorMessage(err))
+	}
+	return nil
+}
+
 // ListInstancesMultiRegion queries ECS instances for multiple regions concurrently.
 // Each region is queried in its own goroutine. Errors for individual regions
 // are captured per-region and do not fail the entire batch.

@@ -1,5 +1,28 @@
 # Changelog
 
+## v0.0.3 (2026-05-09)
+
+### 功能
+
+- ECS 实例详情页：点击 InstanceId 弹窗展示 CPU、Memory、ImageId、VPC、安全组、过期时间等
+- 启动 / 停止 / 重启 ECS 实例：每个操作均需二次确认弹窗
+- 生产环境强制二次确认：红色警告文案 + 特殊按钮文案"确认执行（生产环境）"
+- 操作日志：前端内存记录，最多 50 条，支持清空
+- 实例列表新增操作列：Running 状态显示"停止/重启"，Stopped 状态显示"启动"
+
+### 后端
+
+- provider/aliyun 新增 DescribeInstanceDetail、StartInstance、StopInstance、RebootInstance
+- service 新增 GetInstanceDetail、StartInstance、StopInstance、RebootInstance
+- app.go 新增 GetECSDetail、StartECS、StopECS、RebootECS
+- 放开写操作约束（启动/停止/重启，需二次确认）
+
+### 文档
+
+- 更新 ROADMAP.md、CHANGELOG.md
+- 版本号更新为 v0.0.3
+- go test ./... 全部通过
+
 ## v0.0.2 (2026-05-09)
 
 ### 功能

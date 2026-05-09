@@ -10,9 +10,9 @@
 
 ## 当前版本
 
-当前版本：`v0.0.2`
+当前版本：`v0.0.3`
 
-`v0.0.2` 在 v0.0.1 基础上增加了多 Region 并发查询和分组展示。
+`v0.0.3` 在 v0.0.2 基础上增加了 ECS 实例详情页、启动/停止/重启操作（二次确认）和操作日志。
 
 ---
 
@@ -162,6 +162,10 @@ cd frontend && npm install
 - 选择环境类型（dev / pre / prod）
 - 点击按钮查询 ECS 实例列表
 - 表格展示 ECS 实例信息（InstanceId、InstanceName、Status、ZoneId、PublicIp、PrivateIp、CreationTime）
+- ECS 实例详情页（CPU、Memory、ImageId、VPC、安全组、过期时间等）
+- 启动 / 停止 / 重启 ECS 实例（二次确认弹窗）
+- 生产环境操作强制二次确认（红色警告 + 特殊按钮文案）
+- 操作日志记录（前端内存，最多 50 条）
 - 清空输入 / 清空结果
 - 错误提示区域（含部分 Region 失败时的错误隔离）
 

@@ -1,6 +1,12 @@
 <script setup>
 import { ref, computed } from 'vue'
-import { QueryECSMultiRegion } from '../wailsjs/go/main/App'
+import {
+  QueryECSMultiRegion,
+  GetECSDetail,
+  StartECS,
+  StopECS,
+  RebootECS,
+} from '../wailsjs/go/main/App'
 
 const accessKeyId = ref('')
 const accessKeySecret = ref('')
@@ -10,6 +16,21 @@ const regionResults = ref([])
 const errorMessage = ref('')
 const successMessage = ref('')
 const loading = ref(false)
+
+// Detail modal
+const showDetail = ref(false)
+const detailLoading = ref(false)
+const detailData = ref(null)
+
+// Confirm dialog
+const showConfirm = ref(false)
+const confirmAction = ref('')
+const confirmInstanceId = ref('')
+const confirmInstanceName = ref('')
+const confirmRegion = ref('')
+
+// Operation log
+const operationLogs = ref([])
 
 const envOptions = [
   { label: '开发环境 (dev)', value: 'dev' },
@@ -48,6 +69,20 @@ function toggleRegion(regionValue) {
     selectedRegions.value.push(regionValue)
   } else {
     selectedRegions.value.splice(idx, 1)
+  }
+}
+
+function addLog(action, instanceId, region, success, message) {
+  operationLogs.value.unshift({
+    time: new Date().toLocaleTimeString(),
+    action,
+    instanceId,
+    region,
+    success,
+    message,
+  })
+  if (operationLogs.value.length > 50) {
+    operationLogs.value.pop()
   }
 }
 
@@ -90,6 +125,84 @@ async function queryECS() {
   }
 }
 
+async function viewDetail(instanceId, region) {
+  showDetail.value = true
+  detailLoading.value = true
+  detailData.value = null
+
+  try {
+    const result = await GetECSDetail(
+      accessKeyId.value.trim(),
+      accessKeySecret.value.trim(),
+      region,
+      instanceId
+    )
+    if (result.success) {
+      detailData.value = JSON.parse(result.message)
+    } else {
+      detailData.value = { error: result.message }
+    }
+  } catch (err) {
+    detailData.value = { error: err.message || String(err) }
+  } finally {
+    detailLoading.value = false
+  }
+}
+
+function closeDetail() {
+  showDetail.value = false
+  detailData.value = null
+}
+
+function requestAction(action, instanceId, instanceName, region) {
+  confirmAction.value = action
+  confirmInstanceId.value = instanceId
+  confirmInstanceName.value = instanceName
+  confirmRegion.value = region
+  showConfirm.value = true
+}
+
+function cancelConfirm() {
+  showConfirm.value = false
+  confirmAction.value = ''
+  confirmInstanceId.value = ''
+  confirmInstanceName.value = ''
+  confirmRegion.value = ''
+}
+
+async function executeConfirm() {
+  const action = confirmAction.value
+  const instanceId = confirmInstanceId.value
+  const region = confirmRegion.value
+
+  showConfirm.value = false
+
+  try {
+    let result
+    if (action === 'start') {
+      result = await StartECS(accessKeyId.value.trim(), accessKeySecret.value.trim(), region, instanceId)
+    } else if (action === 'stop') {
+      result = await StopECS(accessKeyId.value.trim(), accessKeySecret.value.trim(), region, instanceId, false)
+    } else if (action === 'reboot') {
+      result = await RebootECS(accessKeyId.value.trim(), accessKeySecret.value.trim(), region, instanceId, false)
+    }
+
+    if (result) {
+      addLog(action, instanceId, region, result.success, result.message)
+      if (result.success) {
+        successMessage.value = result.message
+      } else {
+        errorMessage.value = result.message
+      }
+    }
+  } catch (err) {
+    addLog(action, instanceId, region, false, err.message || String(err))
+    errorMessage.value = '操作失败: ' + (err.message || err)
+  }
+
+  cancelConfirm()
+}
+
 function clearInputs() {
   accessKeyId.value = ''
   accessKeySecret.value = ''
@@ -105,6 +218,10 @@ function clearResults() {
   successMessage.value = ''
 }
 
+function clearLogs() {
+  operationLogs.value = []
+}
+
 function getStatusClass(status) {
   const s = (status || '').toLowerCase()
   if (s === 'running') return 'status-running'
@@ -118,13 +235,24 @@ function getRegionLabel(value) {
   const found = regionOptions.find(r => r.value === value)
   return found ? found.label : value
 }
+
+function getActionLabel(action) {
+  if (action === 'start') return '启动'
+  if (action === 'stop') return '停止'
+  if (action === 'reboot') return '重启'
+  return action
+}
+
+function isProd() {
+  return env.value === 'prod'
+}
 </script>
 
 <template>
   <div class="app-container">
     <header class="app-header">
       <h1>Cloud 管理小助手</h1>
-      <span class="version">v0.0.2</span>
+      <span class="version">v0.0.3</span>
     </header>
 
     <main class="app-main">
@@ -239,11 +367,16 @@ function getRegionLabel(value) {
                     <th>PublicIp</th>
                     <th>PrivateIp</th>
                     <th>CreationTime</th>
+                    <th>操作</th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr v-for="inst in region.instances" :key="inst.instanceId">
-                    <td>{{ inst.instanceId }}</td>
+                    <td>
+                      <a class="link" @click="viewDetail(inst.instanceId, region.region)">
+                        {{ inst.instanceId }}
+                      </a>
+                    </td>
                     <td>{{ inst.instanceName }}</td>
                     <td>
                       <span class="status-badge" :class="getStatusClass(inst.status)">
@@ -254,6 +387,31 @@ function getRegionLabel(value) {
                     <td>{{ inst.publicIp || '-' }}</td>
                     <td>{{ inst.privateIp || '-' }}</td>
                     <td>{{ inst.creationTime }}</td>
+                    <td>
+                      <div class="action-btns">
+                        <button
+                          v-if="inst.status === 'Stopped'"
+                          class="btn btn-sm btn-success"
+                          @click="requestAction('start', inst.instanceId, inst.instanceName, region.region)"
+                        >
+                          启动
+                        </button>
+                        <button
+                          v-if="inst.status === 'Running'"
+                          class="btn btn-sm btn-warning"
+                          @click="requestAction('stop', inst.instanceId, inst.instanceName, region.region)"
+                        >
+                          停止
+                        </button>
+                        <button
+                          v-if="inst.status === 'Running'"
+                          class="btn btn-sm btn-info"
+                          @click="requestAction('reboot', inst.instanceId, inst.instanceName, region.region)"
+                        >
+                          重启
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 </tbody>
               </table>
@@ -261,7 +419,166 @@ function getRegionLabel(value) {
           </div>
         </div>
       </section>
+
+      <!-- Operation Log Section -->
+      <section v-if="operationLogs.length > 0" class="results-section">
+        <div class="log-header">
+          <h2>操作日志</h2>
+          <button class="btn btn-sm btn-secondary" @click="clearLogs">清空日志</button>
+        </div>
+        <div class="table-wrapper">
+          <table class="ecs-table">
+            <thead>
+              <tr>
+                <th>时间</th>
+                <th>操作</th>
+                <th>InstanceId</th>
+                <th>Region</th>
+                <th>结果</th>
+                <th>消息</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(log, idx) in operationLogs" :key="idx">
+                <td>{{ log.time }}</td>
+                <td>{{ getActionLabel(log.action) }}</td>
+                <td>{{ log.instanceId }}</td>
+                <td>{{ log.region }}</td>
+                <td>
+                  <span class="status-badge" :class="log.success ? 'status-running' : 'status-stopped'">
+                    {{ log.success ? '成功' : '失败' }}
+                  </span>
+                </td>
+                <td>{{ log.message }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
     </main>
+
+    <!-- Detail Modal -->
+    <div v-if="showDetail" class="modal-overlay" @click.self="closeDetail">
+      <div class="modal">
+        <div class="modal-header">
+          <h3>实例详情</h3>
+          <button class="modal-close" @click="closeDetail">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div v-if="detailLoading" class="empty-state">加载中...</div>
+          <div v-else-if="detailData && detailData.error" class="region-error-msg">
+            {{ detailData.error }}
+          </div>
+          <div v-else-if="detailData" class="detail-grid">
+            <div class="detail-item">
+              <span class="detail-label">InstanceId</span>
+              <span class="detail-value">{{ detailData.instanceId }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">InstanceName</span>
+              <span class="detail-value">{{ detailData.instanceName }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">Description</span>
+              <span class="detail-value">{{ detailData.description || '-' }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">HostName</span>
+              <span class="detail-value">{{ detailData.hostName || '-' }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">Status</span>
+              <span class="detail-value">
+                <span class="status-badge" :class="getStatusClass(detailData.status)">
+                  {{ detailData.status }}
+                </span>
+              </span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">Region</span>
+              <span class="detail-value">{{ detailData.regionId }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">Zone</span>
+              <span class="detail-value">{{ detailData.zoneId }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">InstanceType</span>
+              <span class="detail-value">{{ detailData.instanceType }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">CPU / Memory</span>
+              <span class="detail-value">{{ detailData.cpu }} vCPU / {{ detailData.memory }} MB</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">ImageId</span>
+              <span class="detail-value">{{ detailData.imageId }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">InternetChargeType</span>
+              <span class="detail-value">{{ detailData.internetChargeType }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">CreationTime</span>
+              <span class="detail-value">{{ detailData.creationTime }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">ExpiredTime</span>
+              <span class="detail-value">{{ detailData.expiredTime || '-' }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">StoppedMode</span>
+              <span class="detail-value">{{ detailData.stoppedMode || '-' }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">PublicIp</span>
+              <span class="detail-value">{{ (detailData.publicIp || []).join(', ') || '-' }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">PrivateIp</span>
+              <span class="detail-value">{{ (detailData.privateIp || []).join(', ') || '-' }}</span>
+            </div>
+            <div class="detail-item full-width">
+              <span class="detail-label">SecurityGroupIds</span>
+              <span class="detail-value">{{ (detailData.securityGroupIds || []).join(', ') || '-' }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Confirm Dialog -->
+    <div v-if="showConfirm" class="modal-overlay" @click.self="cancelConfirm">
+      <div class="modal modal-confirm">
+        <div class="modal-header">
+          <h3>操作确认</h3>
+          <button class="modal-close" @click="cancelConfirm">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div v-if="isProd()" class="prod-warning">
+            当前环境为生产环境，操作不可逆，请谨慎确认！
+          </div>
+          <p class="confirm-text">
+            确定要<strong>{{ getActionLabel(confirmAction) }}</strong>实例吗？
+          </p>
+          <div class="confirm-detail">
+            <div>InstanceId: {{ confirmInstanceId }}</div>
+            <div>InstanceName: {{ confirmInstanceName }}</div>
+            <div>Region: {{ confirmRegion }}</div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" @click="cancelConfirm">取消</button>
+          <button
+            class="btn"
+            :class="isProd() ? 'btn-danger' : 'btn-primary'"
+            @click="executeConfirm"
+          >
+            {{ isProd() ? '确认执行（生产环境）' : '确认' }}
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -463,6 +780,47 @@ body {
   background: #d4d7dd;
 }
 
+.btn-success {
+  background: #67c23a;
+  color: white;
+}
+
+.btn-success:hover {
+  background: #5daf34;
+}
+
+.btn-warning {
+  background: #e6a23c;
+  color: white;
+}
+
+.btn-warning:hover {
+  background: #cf9236;
+}
+
+.btn-info {
+  background: #409eff;
+  color: white;
+}
+
+.btn-info:hover {
+  background: #3a8ee6;
+}
+
+.btn-danger {
+  background: #f56c6c;
+  color: white;
+}
+
+.btn-danger:hover {
+  background: #e45d5d;
+}
+
+.btn-sm {
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
 /* Messages */
 .message {
   padding: 12px 16px;
@@ -488,6 +846,7 @@ body {
   background: white;
   border-radius: 8px;
   padding: 24px;
+  margin-bottom: 16px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
@@ -495,6 +854,17 @@ body {
   font-size: 16px;
   margin-bottom: 16px;
   color: #444;
+}
+
+.log-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.log-header h2 {
+  margin-bottom: 0;
 }
 
 .empty-state {
@@ -595,6 +965,21 @@ body {
   background: #f5f7fa;
 }
 
+.link {
+  color: #667eea;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.link:hover {
+  text-decoration: underline;
+}
+
+.action-btns {
+  display: flex;
+  gap: 6px;
+}
+
 .status-badge {
   display: inline-block;
   padding: 2px 8px;
@@ -626,5 +1011,130 @@ body {
 .status-default {
   background: #f4f4f5;
   color: #909399;
+}
+
+/* Modal */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal {
+  background: white;
+  border-radius: 8px;
+  width: 90%;
+  max-width: 700px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-confirm {
+  max-width: 480px;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid #ebeef5;
+}
+
+.modal-header h3 {
+  font-size: 16px;
+  color: #333;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  font-size: 24px;
+  color: #999;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+
+.modal-close:hover {
+  color: #333;
+}
+
+.modal-body {
+  padding: 20px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.modal-footer {
+  padding: 12px 20px;
+  border-top: 1px solid #ebeef5;
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+/* Detail Grid */
+.detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.detail-item.full-width {
+  grid-column: 1 / -1;
+}
+
+.detail-label {
+  font-size: 12px;
+  color: #999;
+  font-weight: 500;
+}
+
+.detail-value {
+  font-size: 14px;
+  color: #333;
+  word-break: break-all;
+}
+
+/* Confirm Dialog */
+.prod-warning {
+  background: #fdf6ec;
+  color: #e6a23c;
+  padding: 12px;
+  border-radius: 4px;
+  margin-bottom: 16px;
+  font-size: 14px;
+  font-weight: 600;
+  border: 1px solid #faecd8;
+}
+
+.confirm-text {
+  font-size: 15px;
+  margin-bottom: 12px;
+  color: #333;
+}
+
+.confirm-detail {
+  background: #f5f7fa;
+  padding: 12px;
+  border-radius: 4px;
+  font-size: 13px;
+  color: #666;
+  line-height: 1.8;
 }
 </style>

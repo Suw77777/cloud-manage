@@ -41,6 +41,126 @@ func NewECSProvider(accessKeyId, accessKeySecret, region string) (*ECSProvider, 
 	return &ECSProvider{client: client}, nil
 }
 
+// InstanceDetail holds detailed information about an ECS instance.
+type InstanceDetail struct {
+	InstanceId       string   `json:"instanceId"`
+	InstanceName     string   `json:"instanceName"`
+	Description      string   `json:"description"`
+	HostName         string   `json:"hostName"`
+	Status           string   `json:"status"`
+	RegionId         string   `json:"regionId"`
+	ZoneId           string   `json:"zoneId"`
+	InstanceType     string   `json:"instanceType"`
+	Cpu              int32    `json:"cpu"`
+	Memory           int32    `json:"memory"`
+	ImageId          string   `json:"imageId"`
+	InternetChargeType string `json:"internetChargeType"`
+	CreationTime     string   `json:"creationTime"`
+	ExpiredTime      string   `json:"expiredTime"`
+	StoppedMode      string   `json:"stoppedMode"`
+	PublicIp         []string `json:"publicIp"`
+	PrivateIp        []string `json:"privateIp"`
+	SecurityGroupIds []string `json:"securityGroupIds"`
+}
+
+// DescribeInstanceDetail queries detailed information for a single ECS instance.
+func (p *ECSProvider) DescribeInstanceDetail(instanceId string) (*InstanceDetail, error) {
+	request := &ecs.DescribeInstanceAttributeRequest{
+		InstanceId: tea.String(instanceId),
+	}
+
+	response, err := p.client.DescribeInstanceAttribute(request)
+	if err != nil {
+		return nil, fmt.Errorf("DescribeInstanceAttribute failed: %w", err)
+	}
+
+	body := response.Body
+	if body == nil {
+		return nil, fmt.Errorf("empty response body")
+	}
+
+	publicIps := make([]string, 0)
+	if body.PublicIpAddress != nil && body.PublicIpAddress.IpAddress != nil {
+		for _, ip := range body.PublicIpAddress.IpAddress {
+			publicIps = append(publicIps, tea.StringValue(ip))
+		}
+	}
+
+	privateIps := make([]string, 0)
+	if body.VpcAttributes != nil && body.VpcAttributes.PrivateIpAddress != nil && body.VpcAttributes.PrivateIpAddress.IpAddress != nil {
+		for _, ip := range body.VpcAttributes.PrivateIpAddress.IpAddress {
+			privateIps = append(privateIps, tea.StringValue(ip))
+		}
+	}
+
+	securityGroups := make([]string, 0)
+	if body.SecurityGroupIds != nil && body.SecurityGroupIds.SecurityGroupId != nil {
+		for _, sg := range body.SecurityGroupIds.SecurityGroupId {
+			securityGroups = append(securityGroups, tea.StringValue(sg))
+		}
+	}
+
+	return &InstanceDetail{
+		InstanceId:         tea.StringValue(body.InstanceId),
+		InstanceName:       tea.StringValue(body.InstanceName),
+		Description:        tea.StringValue(body.Description),
+		HostName:           tea.StringValue(body.HostName),
+		Status:             tea.StringValue(body.Status),
+		RegionId:           tea.StringValue(body.RegionId),
+		ZoneId:             tea.StringValue(body.ZoneId),
+		InstanceType:       tea.StringValue(body.InstanceType),
+		Cpu:                tea.Int32Value(body.Cpu),
+		Memory:             tea.Int32Value(body.Memory),
+		ImageId:            tea.StringValue(body.ImageId),
+		InternetChargeType: tea.StringValue(body.InternetChargeType),
+		CreationTime:       tea.StringValue(body.CreationTime),
+		ExpiredTime:        tea.StringValue(body.ExpiredTime),
+		StoppedMode:        tea.StringValue(body.StoppedMode),
+		PublicIp:           publicIps,
+		PrivateIp:          privateIps,
+		SecurityGroupIds:   securityGroups,
+	}, nil
+}
+
+// StartInstance starts a stopped ECS instance.
+func (p *ECSProvider) StartInstance(instanceId string) error {
+	request := &ecs.StartInstanceRequest{
+		InstanceId: tea.String(instanceId),
+	}
+	_, err := p.client.StartInstance(request)
+	if err != nil {
+		return fmt.Errorf("StartInstance failed: %w", err)
+	}
+	return nil
+}
+
+// StopInstance stops a running ECS instance.
+func (p *ECSProvider) StopInstance(instanceId string, forceStop bool) error {
+	request := &ecs.StopInstanceRequest{
+		InstanceId:  tea.String(instanceId),
+		ConfirmStop: tea.Bool(forceStop),
+		ForceStop:   tea.Bool(forceStop),
+	}
+	_, err := p.client.StopInstance(request)
+	if err != nil {
+		return fmt.Errorf("StopInstance failed: %w", err)
+	}
+	return nil
+}
+
+// RebootInstance reboots an ECS instance.
+func (p *ECSProvider) RebootInstance(instanceId string, forceStop bool) error {
+	request := &ecs.RebootInstanceRequest{
+		InstanceId: tea.String(instanceId),
+		ForceStop:  tea.Bool(forceStop),
+	}
+	_, err := p.client.RebootInstance(request)
+	if err != nil {
+		return fmt.Errorf("RebootInstance failed: %w", err)
+	}
+	return nil
+}
+
 // DescribeInstances queries ECS instances with pagination.
 func (p *ECSProvider) DescribeInstances(pageNumber, pageSize int32) ([]ECSInstance, int32, error) {
 	request := &ecs.DescribeInstancesRequest{
