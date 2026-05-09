@@ -1,5 +1,23 @@
 # Changelog
 
+## v0.0.2 (2026-05-09)
+
+### 功能
+
+- 支持多 Region 选择：18 个常用阿里云 Region 复选框（国内 + 海外）
+- 支持多 Region 并发查询：每个 Region 独立 goroutine，错误不互相影响
+- 结果按 Region 分组展示：每个 Region 独立表格，带实例计数和错误提示
+- 新增 `QueryECSMultiRegion` 后端方法
+- 新增 `ListInstancesMultiRegion` service 方法
+- 新增 `ECSInstanceAdapter` 适配类型，app.go 不直接依赖 provider 层
+- 版本号更新为 v0.0.2
+
+### 工程
+
+- 新增多 Region 测试用例
+- 更新 Wails 前端绑定（JS + TS 类型定义）
+- go test ./... 全部通过
+
 ## v0.0.1 (2026-05-09)
 
 ### 项目初始化

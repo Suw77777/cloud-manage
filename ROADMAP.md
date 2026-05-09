@@ -31,9 +31,9 @@
 
 **目标**: 支持同时查询多个 Region 的 ECS 实例。
 
-- [ ] 支持多 Region 下拉选择
-- [ ] 支持多 Region 并发查询
-- [ ] 结果按 Region 分组展示
+- [x] 支持多 Region 下拉选择（18 个常用 Region 复选框）
+- [x] 支持多 Region 并发查询（goroutine per region）
+- [x] 结果按 Region 分组展示
 
 ---
 

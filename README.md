@@ -10,9 +10,9 @@
 
 ## 当前版本
 
-当前版本：`v0.0.1`
+当前版本：`v0.0.2`
 
-`v0.0.1` 是项目启动版本，只完成最小可运行骨架，不追求功能完整。
+`v0.0.2` 在 v0.0.1 基础上增加了多 Region 并发查询和分组展示。
 
 ---
 
@@ -154,15 +154,16 @@ cd frontend && npm install
 
 ## 功能说明
 
-### v0.0.1 支持的功能
+### 当前支持的功能
 
 - 从 GUI 输入阿里云 AK/SK
-- 从 GUI 输入 Region
+- 多 Region 选择（18 个常用 Region 复选框，支持国内 + 海外）
+- 多 Region 并发查询，结果按 Region 分组展示
 - 选择环境类型（dev / pre / prod）
 - 点击按钮查询 ECS 实例列表
-- 表格展示 ECS 实例信息（InstanceId、InstanceName、Status、RegionId、ZoneId、PublicIp、PrivateIp、CreationTime）
+- 表格展示 ECS 实例信息（InstanceId、InstanceName、Status、ZoneId、PublicIp、PrivateIp、CreationTime）
 - 清空输入 / 清空结果
-- 错误提示区域
+- 错误提示区域（含部分 Region 失败时的错误隔离）
 
 ### 安全设计
 

@@ -5,3 +5,5 @@ import {main} from '../models';
 export function MaskKey(arg1:string):Promise<string>;
 
 export function QueryECS(arg1:string,arg2:string,arg3:string,arg4:string):Promise<main.QueryECSResult>;
+
+export function QueryECSMultiRegion(arg1:string,arg2:string,arg3:Array<string>,arg4:string):Promise<main.MultiRegionResult>;

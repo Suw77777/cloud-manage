@@ -1,12 +1,12 @@
 <script setup>
-import { ref } from 'vue'
-import { QueryECS } from '../wailsjs/go/main/App'
+import { ref, computed } from 'vue'
+import { QueryECSMultiRegion } from '../wailsjs/go/main/App'
 
 const accessKeyId = ref('')
 const accessKeySecret = ref('')
-const region = ref('cn-hangzhou')
+const selectedRegions = ref(['cn-hangzhou'])
 const env = ref('dev')
-const instances = ref([])
+const regionResults = ref([])
 const errorMessage = ref('')
 const successMessage = ref('')
 const loading = ref(false)
@@ -17,10 +17,44 @@ const envOptions = [
   { label: '生产环境 (prod)', value: 'prod' },
 ]
 
+const regionOptions = [
+  { label: '华东1 杭州', value: 'cn-hangzhou' },
+  { label: '华东2 上海', value: 'cn-shanghai' },
+  { label: '华北1 青岛', value: 'cn-qingdao' },
+  { label: '华北2 北京', value: 'cn-beijing' },
+  { label: '华北3 张家口', value: 'cn-zhangjiakou' },
+  { label: '华北5 呼和浩特', value: 'cn-huhehaote' },
+  { label: '华北6 乌兰察布', value: 'cn-wulanchabu' },
+  { label: '华南1 深圳', value: 'cn-shenzhen' },
+  { label: '华南2 河源', value: 'cn-heyuan' },
+  { label: '华南3 广州', value: 'cn-guangzhou' },
+  { label: '西南1 成都', value: 'cn-chengdu' },
+  { label: '中国香港', value: 'cn-hongkong' },
+  { label: '新加坡', value: 'ap-southeast-1' },
+  { label: '东京', value: 'ap-northeast-1' },
+  { label: '弗吉尼亚', value: 'us-east-1' },
+  { label: '硅谷', value: 'us-west-1' },
+  { label: '法兰克福', value: 'eu-central-1' },
+  { label: '伦敦', value: 'eu-west-1' },
+]
+
+const totalInstances = computed(() => {
+  return regionResults.value.reduce((sum, r) => sum + (r.instances ? r.instances.length : 0), 0)
+})
+
+function toggleRegion(regionValue) {
+  const idx = selectedRegions.value.indexOf(regionValue)
+  if (idx === -1) {
+    selectedRegions.value.push(regionValue)
+  } else {
+    selectedRegions.value.splice(idx, 1)
+  }
+}
+
 async function queryECS() {
   errorMessage.value = ''
   successMessage.value = ''
-  instances.value = []
+  regionResults.value = []
 
   if (!accessKeyId.value.trim()) {
     errorMessage.value = '请输入 AccessKey ID'
@@ -30,21 +64,21 @@ async function queryECS() {
     errorMessage.value = '请输入 AccessKey Secret'
     return
   }
-  if (!region.value.trim()) {
-    errorMessage.value = '请输入 Region'
+  if (selectedRegions.value.length === 0) {
+    errorMessage.value = '请至少选择一个 Region'
     return
   }
 
   loading.value = true
   try {
-    const result = await QueryECS(
+    const result = await QueryECSMultiRegion(
       accessKeyId.value.trim(),
       accessKeySecret.value.trim(),
-      region.value.trim(),
+      selectedRegions.value,
       env.value
     )
     if (result.success) {
-      instances.value = result.instances || []
+      regionResults.value = result.regions || []
       successMessage.value = result.message
     } else {
       errorMessage.value = result.message
@@ -59,14 +93,14 @@ async function queryECS() {
 function clearInputs() {
   accessKeyId.value = ''
   accessKeySecret.value = ''
-  region.value = 'cn-hangzhou'
+  selectedRegions.value = ['cn-hangzhou']
   env.value = 'dev'
   errorMessage.value = ''
   successMessage.value = ''
 }
 
 function clearResults() {
-  instances.value = []
+  regionResults.value = []
   errorMessage.value = ''
   successMessage.value = ''
 }
@@ -79,13 +113,18 @@ function getStatusClass(status) {
   if (s === 'stopping') return 'status-stopping'
   return 'status-default'
 }
+
+function getRegionLabel(value) {
+  const found = regionOptions.find(r => r.value === value)
+  return found ? found.label : value
+}
 </script>
 
 <template>
   <div class="app-container">
     <header class="app-header">
       <h1>Cloud 管理小助手</h1>
-      <span class="version">v0.0.1</span>
+      <span class="version">v0.0.2</span>
     </header>
 
     <main class="app-main">
@@ -114,15 +153,6 @@ function getStatusClass(status) {
             />
           </div>
           <div class="form-group">
-            <label for="region">Region</label>
-            <input
-              id="region"
-              v-model="region"
-              type="text"
-              placeholder="例如: cn-hangzhou"
-            />
-          </div>
-          <div class="form-group">
             <label for="env">环境</label>
             <select id="env" v-model="env">
               <option v-for="opt in envOptions" :key="opt.value" :value="opt.value">
@@ -131,6 +161,32 @@ function getStatusClass(status) {
             </select>
           </div>
         </div>
+
+        <!-- Region Multi-Select -->
+        <div class="region-section">
+          <label>Region（可多选）</label>
+          <div class="region-grid">
+            <label
+              v-for="r in regionOptions"
+              :key="r.value"
+              class="region-checkbox"
+              :class="{ checked: selectedRegions.includes(r.value) }"
+            >
+              <input
+                type="checkbox"
+                :value="r.value"
+                :checked="selectedRegions.includes(r.value)"
+                @change="toggleRegion(r.value)"
+              />
+              <span class="region-label">{{ r.label }}</span>
+              <span class="region-value">{{ r.value }}</span>
+            </label>
+          </div>
+          <div class="selected-summary">
+            已选择 {{ selectedRegions.length }} 个 Region
+          </div>
+        </div>
+
         <div class="button-group">
           <button class="btn btn-primary" :disabled="loading" @click="queryECS">
             {{ loading ? '查询中...' : '查询 ECS' }}
@@ -151,40 +207,58 @@ function getStatusClass(status) {
       <!-- Results Section -->
       <section class="results-section">
         <h2>ECS 实例列表</h2>
-        <div v-if="instances.length === 0 && !loading" class="empty-state">
-          暂无数据，请输入凭据后点击"查询 ECS"
+        <div v-if="regionResults.length === 0 && !loading" class="empty-state">
+          暂无数据，请输入凭据并选择 Region 后点击"查询 ECS"
         </div>
-        <div v-if="instances.length > 0" class="table-wrapper">
-          <table class="ecs-table">
-            <thead>
-              <tr>
-                <th>InstanceId</th>
-                <th>InstanceName</th>
-                <th>Status</th>
-                <th>RegionId</th>
-                <th>ZoneId</th>
-                <th>PublicIp</th>
-                <th>PrivateIp</th>
-                <th>CreationTime</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="inst in instances" :key="inst.instanceId">
-                <td>{{ inst.instanceId }}</td>
-                <td>{{ inst.instanceName }}</td>
-                <td>
-                  <span class="status-badge" :class="getStatusClass(inst.status)">
-                    {{ inst.status }}
-                  </span>
-                </td>
-                <td>{{ inst.regionId }}</td>
-                <td>{{ inst.zoneId }}</td>
-                <td>{{ inst.publicIp || '-' }}</td>
-                <td>{{ inst.privateIp || '-' }}</td>
-                <td>{{ inst.creationTime }}</td>
-              </tr>
-            </tbody>
-          </table>
+
+        <div v-if="regionResults.length > 0">
+          <div class="total-summary">
+            共 {{ totalInstances }} 个实例，跨 {{ regionResults.length }} 个 Region
+          </div>
+
+          <div v-for="region in regionResults" :key="region.region" class="region-group">
+            <div class="region-header">
+              <span class="region-name">{{ getRegionLabel(region.region) }}</span>
+              <span class="region-id">({{ region.region }})</span>
+              <span v-if="region.error" class="region-error">{{ region.error }}</span>
+              <span v-else class="region-count">{{ region.instances.length }} 个实例</span>
+            </div>
+
+            <div v-if="region.error && region.instances.length === 0" class="region-error-msg">
+              查询失败: {{ region.error }}
+            </div>
+
+            <div v-if="region.instances.length > 0" class="table-wrapper">
+              <table class="ecs-table">
+                <thead>
+                  <tr>
+                    <th>InstanceId</th>
+                    <th>InstanceName</th>
+                    <th>Status</th>
+                    <th>ZoneId</th>
+                    <th>PublicIp</th>
+                    <th>PrivateIp</th>
+                    <th>CreationTime</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="inst in region.instances" :key="inst.instanceId">
+                    <td>{{ inst.instanceId }}</td>
+                    <td>{{ inst.instanceName }}</td>
+                    <td>
+                      <span class="status-badge" :class="getStatusClass(inst.status)">
+                        {{ inst.status }}
+                      </span>
+                    </td>
+                    <td>{{ inst.zoneId }}</td>
+                    <td>{{ inst.publicIp || '-' }}</td>
+                    <td>{{ inst.privateIp || '-' }}</td>
+                    <td>{{ inst.creationTime }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </section>
     </main>
@@ -289,6 +363,68 @@ body {
   box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
 }
 
+/* Region Multi-Select */
+.region-section {
+  margin-bottom: 16px;
+}
+
+.region-section > label {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  color: #555;
+  margin-bottom: 8px;
+}
+
+.region-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.region-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid #e4e7ed;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 13px;
+}
+
+.region-checkbox:hover {
+  border-color: #667eea;
+}
+
+.region-checkbox.checked {
+  background: #f0f2ff;
+  border-color: #667eea;
+}
+
+.region-checkbox input[type="checkbox"] {
+  margin: 0;
+  accent-color: #667eea;
+}
+
+.region-label {
+  color: #333;
+  font-weight: 500;
+}
+
+.region-value {
+  color: #999;
+  font-size: 11px;
+}
+
+.selected-summary {
+  font-size: 13px;
+  color: #666;
+  padding: 4px 0;
+}
+
 .button-group {
   display: flex;
   gap: 12px;
@@ -368,6 +504,67 @@ body {
   font-size: 14px;
 }
 
+.total-summary {
+  font-size: 14px;
+  color: #666;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #ebeef5;
+}
+
+/* Region Group */
+.region-group {
+  margin-bottom: 24px;
+}
+
+.region-group:last-child {
+  margin-bottom: 0;
+}
+
+.region-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: #f5f7fa;
+  border-radius: 6px;
+  margin-bottom: 8px;
+}
+
+.region-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: #333;
+}
+
+.region-id {
+  font-size: 13px;
+  color: #999;
+}
+
+.region-count {
+  margin-left: auto;
+  font-size: 13px;
+  color: #67c23a;
+  font-weight: 500;
+}
+
+.region-error {
+  margin-left: auto;
+  font-size: 13px;
+  color: #f56c6c;
+  font-weight: 500;
+}
+
+.region-error-msg {
+  padding: 12px;
+  background: #fef0f0;
+  color: #f56c6c;
+  border-radius: 4px;
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+
 .table-wrapper {
   overflow-x: auto;
 }
@@ -379,8 +576,8 @@ body {
 }
 
 .ecs-table th {
-  background: #f5f7fa;
-  padding: 10px 12px;
+  background: #fafafa;
+  padding: 8px 12px;
   text-align: left;
   font-weight: 600;
   color: #606266;
@@ -389,7 +586,7 @@ body {
 }
 
 .ecs-table td {
-  padding: 10px 12px;
+  padding: 8px 12px;
   border-bottom: 1px solid #ebeef5;
   color: #606266;
 }

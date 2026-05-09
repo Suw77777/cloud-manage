@@ -9,3 +9,7 @@ export function MaskKey(arg1) {
 export function QueryECS(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['QueryECS'](arg1, arg2, arg3, arg4);
 }
+
+export function QueryECSMultiRegion(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['QueryECSMultiRegion'](arg1, arg2, arg3, arg4);
+}
