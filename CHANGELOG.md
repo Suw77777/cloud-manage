@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.0.3-refactor (2026-05-09)
+
+### 重构
+
+- App.vue 从 1140 行降到 170 行
+- 样式抽到 `assets/main.css`
+- 逻辑抽到 `composables/useECS.js`
+- 组件拆分：`EcsResultTable`、`InstanceDetailModal`、`ConfirmDialog`、`OperationLog`
+- 新增工程约束：入口文件不超过 300 行
+
 ## v0.0.3 (2026-05-09)
 
 ### 功能

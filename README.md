@@ -60,7 +60,16 @@ cloud-manage/
 │   ├── vite.config.js
 │   ├── src/
 │   │   ├── main.js
-│   │   └── App.vue             # 主窗口组件
+│   │   ├── App.vue             # 主窗口入口（< 300 行）
+│   │   ├── assets/
+│   │   │   └── main.css        # 全局样式
+│   │   ├── components/
+│   │   │   ├── EcsResultTable.vue
+│   │   │   ├── InstanceDetailModal.vue
+│   │   │   ├── ConfirmDialog.vue
+│   │   │   └── OperationLog.vue
+│   │   └── composables/
+│   │       └── useECS.js       # ECS 查询/操作逻辑
 │   └── wailsjs/
 │       └── go/
 │           └── main/
