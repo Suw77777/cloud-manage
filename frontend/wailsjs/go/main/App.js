@@ -37,3 +37,23 @@ export function StartECS(arg1, arg2, arg3, arg4) {
 export function StopECS(arg1, arg2, arg3, arg4, arg5) {
   return window['go']['main']['App']['StopECS'](arg1, arg2, arg3, arg4, arg5);
 }
+
+export function ListSLSLogStores(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['ListSLSLogStores'](arg1, arg2, arg3, arg4);
+}
+
+export function QuerySLSLogs(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9) {
+  return window['go']['main']['App']['QuerySLSLogs'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9);
+}
+
+export function QuerySLSLogsStream(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9) {
+  return window['go']['main']['App']['QuerySLSLogsStream'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9);
+}
+
+export function ListOSSBuckets(arg1, arg2, arg3) {
+  return window['go']['main']['App']['ListOSSBuckets'](arg1, arg2, arg3);
+}
+
+export function ListOSSObjects(arg1, arg2, arg3, arg4, arg5, arg6) {
+  return window['go']['main']['App']['ListOSSObjects'](arg1, arg2, arg3, arg4, arg5, arg6);
+}

@@ -19,3 +19,13 @@ export function RebootECS(arg1:string,arg2:string,arg3:string,arg4:string,arg5:b
 export function StartECS(arg1:string,arg2:string,arg3:string,arg4:string):Promise<main.OperationResult>;
 
 export function StopECS(arg1:string,arg2:string,arg3:string,arg4:string,arg5:boolean):Promise<main.OperationResult>;
+
+export function ListSLSLogStores(arg1:string,arg2:string,arg3:string,arg4:string):Promise<main.SLSLogStoreResult>;
+
+export function QuerySLSLogs(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string,arg7:number,arg8:number,arg9:number):Promise<main.SLSLogQueryResult>;
+
+export function QuerySLSLogsStream(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string,arg7:number,arg8:number,arg9:number):Promise<main.SLSStreamResult>;
+
+export function ListOSSBuckets(arg1:string,arg2:string,arg3:string):Promise<main.OSSBucketResult>;
+
+export function ListOSSObjects(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string,arg6:number):Promise<main.OSSObjectResult>;
