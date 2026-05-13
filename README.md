@@ -10,9 +10,9 @@
 
 ## 当前版本
 
-当前版本：`v0.0.3`
+当前版本：`v0.0.8`
 
-`v0.0.3` 在 v0.0.2 基础上增加了 ECS 实例详情页、启动/停止/重启操作（二次确认）和操作日志。
+`v0.0.8` 新增完整 CLI 命令行工具，支持 ECS、CMS、SLS、OSS 四大服务。
 
 ---
 
@@ -22,7 +22,7 @@ Cloud 管理小助手是一个面向运维人员的桌面 GUI 工具。
 
 GUI 是主要入口。
 
-CLI 可以保留，但只作为调试入口、自动化入口和后续脚本化入口。
+CLI 作为调试入口、自动化入口和脚本化入口。
 
 ---
 
@@ -31,7 +31,7 @@ CLI 可以保留，但只作为调试入口、自动化入口和后续脚本化�
 - **后端**: Golang
 - **GUI 框架**: Wails v2
 - **前端**: Vue 3 + Vite
-- **云厂商**: 阿里云 ECS SDK
+- **云厂商**: 阿里云（ECS、CMS、SLS、OSS）
 
 ---
 
@@ -39,45 +39,62 @@ CLI 可以保留，但只作为调试入口、自动化入口和后续脚本化�
 
 ```
 cloud-manage/
-├── main.go                     # Wails 主入口 (GUI)
-├── app.go                      # Wails 绑定层，暴露方法给前端
-├── wails.json                  # Wails 配置
+├── main.go                         # Wails 主入口 (GUI)
+├── app.go                          # Wails 绑定层，暴露方法给前端
+├── wails.json                      # Wails 配置
 ├── go.mod
 ├── go.sum
 ├── cmd/
 │   └── cli/
-│       └── main.go             # CLI 调试入口（非主入口）
+│       └── main.go                 # CLI 命令行入口
 ├── service/
-│   └── ecs.go                  # 业务编排层
+│   ├── ecs.go                      # ECS 业务编排层
+│   ├── ecs_test.go                 # ECS 单元测试
+│   ├── cms.go                      # CMS 业务编排层
+│   ├── sls.go                      # SLS 业务编排层
+│   └── oss.go                      # OSS 业务编排层
 ├── provider/
 │   └── aliyun/
-│       └── ecs.go              # 阿里云 ECS SDK 封装
+│       ├── ecs.go                  # 阿里云 ECS SDK 封装
+│       ├── cms.go                  # 阿里云 CMS SDK 封装
+│       ├── sls.go                  # 阿里云 SLS SDK 封装
+│       └── oss.go                  # 阿里云 OSS SDK 封装
 ├── security/
-│   └── sanitize.go             # 敏感信息脱敏
+│   ├── sanitize.go                 # 敏感信息脱敏
+│   └── sanitize_test.go            # 脱敏单元测试
 ├── frontend/
 │   ├── index.html
 │   ├── package.json
 │   ├── vite.config.js
 │   ├── src/
 │   │   ├── main.js
-│   │   ├── App.vue             # 主窗口入口（< 300 行）
+│   │   ├── App.vue                 # 主窗口入口
 │   │   ├── assets/
-│   │   │   └── main.css        # 全局样式
+│   │   │   └── main.css            # 全局样式
 │   │   ├── components/
-│   │   │   ├── EcsResultTable.vue
-│   │   │   ├── InstanceDetailModal.vue
-│   │   │   ├── ConfirmDialog.vue
-│   │   │   └── OperationLog.vue
+│   │   │   ├── EcsResultTable.vue  # ECS 实例表格
+│   │   │   ├── InstanceDetailModal.vue  # ECS 详情弹窗
+│   │   │   ├── ConfirmDialog.vue   # 确认弹窗
+│   │   │   ├── OperationLog.vue    # 操作日志
+│   │   │   ├── CmsMonitor.vue      # 云监控组件
+│   │   │   ├── SlsQuery.vue        # SLS 日志查询组件
+│   │   │   ├── OssBrowser.vue      # OSS 浏览器组件
+│   │   │   ├── PaginationBar.vue   # 分页组件
+│   │   │   └── VirtualScroller.vue # 虚拟滚动组件
 │   │   └── composables/
-│   │       └── useECS.js       # ECS 查询/操作逻辑
+│   │       ├── useECS.js           # ECS 查询/操作逻辑
+│   │       ├── useCMS.js           # CMS 监控逻辑
+│   │       ├── useSLS.js           # SLS 日志查询逻辑
+│   │       ├── useOSS.js           # OSS 浏览逻辑
+│   │       └── usePagination.js    # 分页逻辑
 │   └── wailsjs/
 │       └── go/
 │           └── main/
-│               └── App.js      # Wails 前端绑定（自动生成）
+│               └── App.js          # Wails 前端绑定（自动生成）
 ├── scripts/
-│   ├── dev.sh                  # 开发启动脚本
-│   ├── build.sh                # 构建脚本
-│   └── test.sh                 # 测试脚本
+│   ├── dev.sh                      # 开发启动脚本
+│   ├── build.sh                    # 构建脚本
+│   └── test.sh                     # 测试脚本
 ├── README.md
 ├── ROADMAP.md
 └── CHANGELOG.md
@@ -90,7 +107,7 @@ cloud-manage/
 ```
 ┌─────────────────────────────────────────────────┐
 │                  frontend (Vue)                  │
-│            页面展示 + 用户交互                     │
+│      ECS / CMS / SLS / OSS 四大模块              │
 └──────────────────────┬──────────────────────────┘
                        │ Wails 调用
 ┌──────────────────────▼──────────────────────────┐
@@ -100,12 +117,12 @@ cloud-manage/
                        │
 ┌──────────────────────▼──────────────────────────┐
 │               service 层 (业务编排)               │
-│              参数校验 + 结果组装                    │
+│         ecs / cms / sls / oss 四个服务            │
 └──────────────────────┬──────────────────────────┘
                        │
 ┌──────────────────────▼──────────────────────────┐
 │           provider/aliyun 层 (SDK 封装)           │
-│           阿里云 ECS SDK 调用                      │
+│       ECS / CMS / SLS / OSS 四个 Provider        │
 └──────────────────────┬──────────────────────────┘
                        │
 ┌──────────────────────▼──────────────────────────┐
@@ -116,10 +133,9 @@ cloud-manage/
 
 ### 工程约束
 
-- **入口文件行数限制**：`app.go` 和 `App.vue` 作为入口文件，单文件不超过 300 行。超出时必须拆分：
-  - `App.vue`：样式抽到 `assets/`，组件抽到 `components/`，逻辑抽到 `composables/`
-  - `app.go`：类型定义抽到独立文件，service 层不放绑定层
-- 新增功能优先以组件 / composable 方式扩展，不要往入口文件堆代码
+- **模块化原则**：新增功能以组件 / composable / service / provider 方式扩展
+- **单一职责**：每个文件只负责一个功能模块
+- **分层架构**：严格遵循 frontend → app.go → service → provider → security 的调用链
 
 ---
 
@@ -170,29 +186,71 @@ cd frontend && npm install
 
 ## 功能说明
 
-### 当前支持的功能
+### ECS 实例管理
 
-- 从 GUI 输入阿里云 AK/SK
 - 多 Region 选择（18 个常用 Region 复选框，支持国内 + 海外）
 - 多 Region 并发查询，结果按 Region 分组展示
-- 选择环境类型（dev / pre / prod）
-- 点击按钮查询 ECS 实例列表
-- 表格展示 ECS 实例信息（InstanceId、InstanceName、Status、ZoneId、PublicIp、PrivateIp、CreationTime）
 - ECS 实例详情页（CPU、Memory、ImageId、VPC、安全组、过期时间等）
 - 启动 / 停止 / 重启 ECS 实例（二次确认弹窗）
 - 生产环境操作强制二次确认（红色警告 + 特殊按钮文案）
 - 操作日志记录（前端内存，最多 50 条）
-- 清空输入 / 清空结果
-- 错误提示区域（含部分 Region 失败时的错误隔离）
 
-### 安全设计
+### 云监控 (CMS)
+
+- 从 ECS 结果选择实例查看监控数据
+- 监控指标：CPU 使用率、内存使用率、磁盘读写 BPS、网络流量
+- 进度条可视化展示（颜色阈值：正常/警告/危险）
+- 支持多实例批量查询
+
+### 日志服务 (SLS)
+
+- 输入 SLS Project 名称获取 Logstore 列表
+- 日志查询：时间范围选择（15 分钟到 7 天）、最大行数设置
+- 自定义查询语句支持
+- 日志结果表格展示
+- 分页显示（默认每页 50 条）
+- 流式查询（边查边显示）
+
+### 对象存储 (OSS)
+
+- 列出所有 Bucket
+- 浏览 Bucket 内的对象和目录
+- 目录导航：面包屑、返回上级、返回根目录
+- 对象表格展示：图标、名称、大小、修改时间、存储类型
+
+### CLI 命令行
+
+```bash
+# ECS 实例管理
+cloud-cli ecs list                        # 列出实例
+cloud-cli ecs detail <id>                 # 查看详情
+cloud-cli ecs start/stop/reboot <id>      # 操作实例
+
+# 云监控
+cloud-cli cms metrics <id>               # 查询监控指标
+
+# 日志服务
+cloud-cli sls logstores <project>        # 列出 Logstore
+cloud-cli sls logs <project> <logstore>  # 查询日志
+
+# 对象存储
+cloud-cli oss buckets                    # 列出 Bucket
+cloud-cli oss objects <bucket>           # 列出对象
+```
+
+支持环境变量 `CLOUD_ACCESS_KEY_ID` / `CLOUD_ACCESS_KEY_SECRET` 配置凭证。
+
+---
+
+## 安全设计
 
 - 不硬编码 AK/SK
 - 不日志打印 AK/SK
 - 不保存 AK/SK 到本地文件
 - 不使用 localStorage / sessionStorage 保存 AK/SK
 - 错误信息自动脱敏
-- 仅支持只读查询，不支持创建/删除/重启/停止 ECS
+- ECS 写操作（启动/停止/重启）需二次确认
+- 生产环境操作强制二次确认
 
 ---
 

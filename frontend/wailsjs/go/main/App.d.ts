@@ -4,6 +4,10 @@ import {main} from '../models';
 
 export function GetECSDetail(arg1:string,arg2:string,arg3:string,arg4:string):Promise<main.OperationResult>;
 
+export function GetECSMetrics(arg1:string,arg2:string,arg3:string,arg4:string):Promise<main.CMSMetricsResult>;
+
+export function GetECSMetricsMultiRegion(arg1:string,arg2:string,arg3:Array<Record<string, string>>):Promise<main.CMSMetricsResult>;
+
 export function MaskKey(arg1:string):Promise<string>;
 
 export function QueryECS(arg1:string,arg2:string,arg3:string,arg4:string):Promise<main.QueryECSResult>;

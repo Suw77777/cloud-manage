@@ -6,6 +6,14 @@ export function GetECSDetail(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['GetECSDetail'](arg1, arg2, arg3, arg4);
 }
 
+export function GetECSMetrics(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['GetECSMetrics'](arg1, arg2, arg3, arg4);
+}
+
+export function GetECSMetricsMultiRegion(arg1, arg2, arg3) {
+  return window['go']['main']['App']['GetECSMetricsMultiRegion'](arg1, arg2, arg3);
+}
+
 export function MaskKey(arg1) {
   return window['go']['main']['App']['MaskKey'](arg1);
 }

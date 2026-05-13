@@ -6,6 +6,8 @@
 *.dylib
 *.test
 *.out
+cloud-cli
+cloud-manage
 
 # Wails
 build/bin/
