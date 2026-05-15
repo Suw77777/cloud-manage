@@ -269,3 +269,23 @@ cloud-manage oss objects <bucket>           # 列出对象
 ## Changelog
 
 详见 [CHANGELOG.md](./CHANGELOG.md)
+
+---
+
+## Contributors
+
+感谢以下贡献者对本项目的支持：
+
+| 贡献者 | 角色 | 贡献内容 |
+|--------|------|----------|
+| [Suw77777](https://github.com/Suw77777) | 项目发起人 & 主要开发者 | 项目架构设计、需求定义、代码审查、测试验证 |
+| [MiMo-V2.5-Pro](https://platform.xiaomimimo.com) | AI 编程助手 (小米) | 代码实现、功能开发、Bug 修复、文档编写 |
+
+### AI 贡献说明
+
+本项目 v0.0.1 ~ v0.0.9 版本的核心代码由小米 MiMo-V2.5-Pro AI 模型辅助生成，包括：
+
+- 后端架构：Go 服务层、Provider 层、安全层实现
+- 前端组件：Vue 3 组件、Composables、样式开发
+- 功能模块：ECS、CMS、SLS、OSS 四大云服务模块
+- 工程化：构建脚本、测试用例、项目文档
