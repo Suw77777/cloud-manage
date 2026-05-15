@@ -10,9 +10,9 @@
 
 ## 当前版本
 
-当前版本：`v0.0.9`
+当前版本：`v0.0.10`
 
-`v0.0.9` 合并 GUI 和 CLI 为统一入口，自动检测环境选择运行模式。
+`v0.0.10` 分离 GUI 和 CLI，支持多平台交叉编译。
 
 ---
 
@@ -20,11 +20,16 @@
 
 Cloud 管理小助手是一个面向运维人员的云资源管理工具。
 
-**统一入口**：单一二进制 `cloud-manage`，自动检测环境选择模式。
+**双模式支持**：
+- **GUI 桌面应用**：基于 Wails，适合有图形环境的系统
+- **CLI 命令行工具**：纯 Go 编译，支持 Linux/macOS/Windows，无 GUI 依赖
 
-- 有图形环境 → 自动启动 GUI 桌面应用
-- 无图形环境 → 自动进入 CLI 命令行模式
-- 可通过 `--gui` / `--cli` 标志强制指定模式
+**支持平台**：
+| 平台 | CLI | GUI |
+|------|-----|-----|
+| Linux (amd64/arm64) | ✅ | ✅ (需 GTK/WebKit) |
+| macOS (Intel/Apple Silicon) | ✅ | ✅ |
+| Windows (amd64) | ✅ | ✅ (需 WebView2) |
 
 ---
 
@@ -41,8 +46,12 @@ Cloud 管理小助手是一个面向运维人员的云资源管理工具。
 
 ```
 cloud-manage/
-├── main.go                         # 统一入口（GUI + CLI 自动检测）
+├── main.go                         # GUI 入口（Wails）
 ├── app.go                          # Wails 绑定层，暴露方法给前端
+├── cmd/
+│   └── cli/
+│       └── main.go                 # CLI 入口（纯 Go，无 GUI 依赖）
+├── Dockerfile                      # Docker 构建环境（Ubuntu 22.04）
 ├── wails.json                      # Wails 配置
 ├── go.mod
 ├── go.sum
@@ -92,7 +101,10 @@ cloud-manage/
 │               └── App.js          # Wails 前端绑定（自动生成）
 ├── scripts/
 │   ├── dev.sh                      # 开发启动脚本
-│   ├── build.sh                    # 构建脚本
+│   ├── build.sh                    # GUI 构建脚本
+│   ├── build-cli.sh                # CLI 交叉编译脚本（多平台）
+│   ├── build-gui-docker.sh         # GUI Docker 构建脚本
+│   ├── build-all.sh                # 一键构建 CLI + GUI
 │   └── test.sh                     # 测试脚本
 ├── README.md
 ├── ROADMAP.md
@@ -140,25 +152,77 @@ cloud-manage/
 
 ## 快速开始
 
-### 环境要求
+### 方式一：直接使用 CLI（推荐）
 
-- Go 1.21+
-- Node.js 18+
-- npm 9+
-- Wails v2 CLI (`go install github.com/wailsapp/wails/v2/cmd/wails@latest`)
-- Linux: `libgtk-3-dev`, `libwebkit2gtk-4.0-dev`
-
-### 安装依赖
+下载对应平台的 CLI 二进制文件即可使用，无需安装依赖：
 
 ```bash
-# 安装 Wails CLI
-go install github.com/wailsapp/wails/v2/cmd/wails@latest
+# Linux amd64
+wget https://github.com/Suw77777/cloud-manage/releases/latest/download/cloud-cli-linux-amd64
+chmod +x cloud-cli-linux-amd64
+mv cloud-cli-linux-amd64 cloud-cli
 
-# Linux 系统依赖
+# macOS (Apple Silicon)
+wget https://github.com/Suw77777/cloud-manage/releases/latest/download/cloud-cli-darwin-arm64
+chmod +x cloud-cli-darwin-arm64
+mv cloud-cli-darwin-arm64 cloud-cli
+
+# Windows (PowerShell)
+Invoke-WebRequest -Uri "https://github.com/Suw77777/cloud-manage/releases/latest/download/cloud-cli-windows-amd64.exe" -OutFile "cloud-cli.exe"
+```
+
+使用示例：
+```bash
+# 设置凭证
+export CLOUD_ACCESS_KEY_ID=your-key-id
+export CLOUD_ACCESS_KEY_SECRET=your-key-secret
+
+# 列出 ECS 实例
+./cloud-cli ecs list
+
+# 查看实例详情
+./cloud-cli ecs detail i-xxx
+
+# 查询监控指标
+./cloud-cli cms metrics i-xxx
+```
+
+### 方式二：从源码构建
+
+#### 构建 CLI（所有平台）
+
+```bash
+# 交叉编译 Linux/macOS/Windows
+./scripts/build-cli.sh
+
+# 输出在 release/ 目录
+ls release/
+```
+
+#### 构建 GUI
+
+**Ubuntu 22.04 / Linux Mint 21 及以下：**
+```bash
+# 安装依赖
 sudo apt install libgtk-3-dev libwebkit2gtk-4.0-dev
 
-# 前端依赖
-cd frontend && npm install
+# 安装 Wails
+go install github.com/wailsapp/wails/v2/cmd/wails@latest
+
+# 构建
+./scripts/build.sh
+```
+
+**Ubuntu 24.04 / Linux Mint 22 及以上：**
+```bash
+# 使用 Docker 构建（解决 libwebkit2gtk-4.1 兼容问题）
+./scripts/build-gui-docker.sh
+```
+
+#### 一键构建全部
+
+```bash
+./scripts/build-all.sh
 ```
 
 ### 开发模式
@@ -166,14 +230,6 @@ cd frontend && npm install
 ```bash
 ./scripts/dev.sh
 ```
-
-### 构建
-
-```bash
-./scripts/build.sh
-```
-
-构建产物位于 `build/bin/` 目录。
 
 ### 测试
 
@@ -220,33 +276,41 @@ cd frontend && npm install
 ### CLI 命令行
 
 ```bash
-# 自动检测模式（有图形环境启动 GUI，否则进入 CLI）
-cloud-manage
-
-# 强制 GUI 模式
-cloud-manage --gui
-
-# 强制 CLI 模式
-cloud-manage --cli ecs list
-
 # ECS 实例管理
-cloud-manage ecs list                        # 列出实例
-cloud-manage ecs detail <id>                 # 查看详情
-cloud-manage ecs start/stop/reboot <id>      # 操作实例
+cloud-cli ecs list                            # 列出实例
+cloud-cli ecs detail <id>                     # 查看详情
+cloud-cli ecs start/stop/reboot <id>          # 操作实例
 
 # 云监控
-cloud-manage cms metrics <id>               # 查询监控指标
+cloud-cli cms metrics <id>                   # 查询监控指标
 
 # 日志服务
-cloud-manage sls logstores <project>        # 列出 Logstore
-cloud-manage sls logs <project> <logstore>  # 查询日志
+cloud-cli sls logstores <project>            # 列出 Logstore
+cloud-cli sls logs <project> <logstore>      # 查询日志
 
 # 对象存储
-cloud-manage oss buckets                    # 列出 Bucket
-cloud-manage oss objects <bucket>           # 列出对象
+cloud-cli oss buckets                        # 列出 Bucket
+cloud-cli oss objects <bucket>               # 列出对象
+
+# 所有 Region 查询
+cloud-cli -region all ecs list
 ```
 
-支持环境变量 `CLOUD_ACCESS_KEY_ID` / `CLOUD_ACCESS_KEY_SECRET` 配置凭证。
+**认证方式：**
+```bash
+# 方式一：环境变量（推荐）
+export CLOUD_ACCESS_KEY_ID=your-key-id
+export CLOUD_ACCESS_KEY_SECRET=your-key-secret
+
+# 方式二：命令行参数
+cloud-cli -id your-key-id -secret your-key-secret ecs list
+```
+
+**输出格式：**
+```bash
+# JSON 格式输出
+cloud-cli -json ecs list
+```
 
 ---
 
