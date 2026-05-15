@@ -1,6 +1,6 @@
 # Cloud 管理小助手
 
-一个使用 Golang + Wails + Vue 开发的云资源管理桌面工具。
+一个使用 Golang + Wails + Vue 开发的云资源管理工具。
 
 后端使用 Golang，负责云厂商 SDK 调用、账号鉴权、资源查询、操作封装和安全校验。
 
@@ -10,19 +10,21 @@
 
 ## 当前版本
 
-当前版本：`v0.0.8`
+当前版本：`v0.0.9`
 
-`v0.0.8` 新增完整 CLI 命令行工具，支持 ECS、CMS、SLS、OSS 四大服务。
+`v0.0.9` 合并 GUI 和 CLI 为统一入口，自动检测环境选择运行模式。
 
 ---
 
 ## 项目定位
 
-Cloud 管理小助手是一个面向运维人员的桌面 GUI 工具。
+Cloud 管理小助手是一个面向运维人员的云资源管理工具。
 
-GUI 是主要入口。
+**统一入口**：单一二进制 `cloud-manage`，自动检测环境选择模式。
 
-CLI 作为调试入口、自动化入口和脚本化入口。
+- 有图形环境 → 自动启动 GUI 桌面应用
+- 无图形环境 → 自动进入 CLI 命令行模式
+- 可通过 `--gui` / `--cli` 标志强制指定模式
 
 ---
 
@@ -39,14 +41,11 @@ CLI 作为调试入口、自动化入口和脚本化入口。
 
 ```
 cloud-manage/
-├── main.go                         # Wails 主入口 (GUI)
+├── main.go                         # 统一入口（GUI + CLI 自动检测）
 ├── app.go                          # Wails 绑定层，暴露方法给前端
 ├── wails.json                      # Wails 配置
 ├── go.mod
 ├── go.sum
-├── cmd/
-│   └── cli/
-│       └── main.go                 # CLI 命令行入口
 ├── service/
 │   ├── ecs.go                      # ECS 业务编排层
 │   ├── ecs_test.go                 # ECS 单元测试
@@ -221,21 +220,30 @@ cd frontend && npm install
 ### CLI 命令行
 
 ```bash
+# 自动检测模式（有图形环境启动 GUI，否则进入 CLI）
+cloud-manage
+
+# 强制 GUI 模式
+cloud-manage --gui
+
+# 强制 CLI 模式
+cloud-manage --cli ecs list
+
 # ECS 实例管理
-cloud-cli ecs list                        # 列出实例
-cloud-cli ecs detail <id>                 # 查看详情
-cloud-cli ecs start/stop/reboot <id>      # 操作实例
+cloud-manage ecs list                        # 列出实例
+cloud-manage ecs detail <id>                 # 查看详情
+cloud-manage ecs start/stop/reboot <id>      # 操作实例
 
 # 云监控
-cloud-cli cms metrics <id>               # 查询监控指标
+cloud-manage cms metrics <id>               # 查询监控指标
 
 # 日志服务
-cloud-cli sls logstores <project>        # 列出 Logstore
-cloud-cli sls logs <project> <logstore>  # 查询日志
+cloud-manage sls logstores <project>        # 列出 Logstore
+cloud-manage sls logs <project> <logstore>  # 查询日志
 
 # 对象存储
-cloud-cli oss buckets                    # 列出 Bucket
-cloud-cli oss objects <bucket>           # 列出对象
+cloud-manage oss buckets                    # 列出 Bucket
+cloud-manage oss objects <bucket>           # 列出对象
 ```
 
 支持环境变量 `CLOUD_ACCESS_KEY_ID` / `CLOUD_ACCESS_KEY_SECRET` 配置凭证。

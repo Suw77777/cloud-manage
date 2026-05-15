@@ -16,4 +16,9 @@ export PATH=$PATH:/root/go/bin
 wails build
 
 echo ""
-echo "==> Build complete. Output: build/bin/"
+echo "==> Build complete. Output: build/bin/cloud-manage"
+echo ""
+echo "Usage:"
+echo "  ./build/bin/cloud-manage          # Auto-detect mode"
+echo "  ./build/bin/cloud-manage --gui    # Force GUI mode"
+echo "  ./build/bin/cloud-manage --cli    # Force CLI mode"
