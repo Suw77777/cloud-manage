@@ -32,7 +32,7 @@ func NewECSProvider(accessKeyId, accessKeySecret, region string) (*ECSProvider, 
 		AccessKeySecret: tea.String(accessKeySecret),
 		RegionId:        tea.String(region),
 	}
-	config.Endpoint = tea.String(fmt.Sprintf("ecs.%s.aliyuncs.com", region))
+	config.Endpoint = tea.String(fmt.Sprintf("https://ecs.%s.aliyuncs.com", region))
 
 	client, err := ecs.NewClient(config)
 	if err != nil {
@@ -163,7 +163,9 @@ func (p *ECSProvider) RebootInstance(instanceId string, forceStop bool) error {
 
 // DescribeInstances queries ECS instances with pagination.
 func (p *ECSProvider) DescribeInstances(pageNumber, pageSize int32) ([]ECSInstance, int32, error) {
+	region := tea.StringValue(p.client.RegionId)
 	request := &ecs.DescribeInstancesRequest{
+		RegionId:   tea.String(region),
 		PageNumber: tea.Int32(pageNumber),
 		PageSize:   tea.Int32(pageSize),
 	}

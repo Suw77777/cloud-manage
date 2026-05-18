@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-const version = "v0.0.9"
+const version = "v0.0.10"
 
 var (
 	accessKeyId     string

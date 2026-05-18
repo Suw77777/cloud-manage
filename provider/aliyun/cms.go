@@ -21,7 +21,7 @@ func NewCMSProvider(accessKeyId, accessKeySecret, region string) (*CMSProvider, 
 		AccessKeySecret: tea.String(accessKeySecret),
 		RegionId:        tea.String(region),
 	}
-	config.Endpoint = tea.String("metrics.cn-hangzhou.aliyuncs.com")
+	config.Endpoint = tea.String("https://metrics.cn-hangzhou.aliyuncs.com")
 
 	client, err := cms.NewClient(config)
 	if err != nil {
