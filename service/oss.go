@@ -79,11 +79,21 @@ func (s *OSSService) ListBuckets(accessKeyId, accessKeySecret, region string) (*
 
 // ListObjects lists objects in an OSS bucket.
 func (s *OSSService) ListObjects(accessKeyId, accessKeySecret, region, bucket, prefix string, maxKeys int32) (*ListObjectsResult, error) {
-	if accessKeyId == "" || accessKeySecret == "" || region == "" || bucket == "" {
-		return nil, fmt.Errorf("accessKeyId, accessKeySecret, region and bucket are required")
+	if accessKeyId == "" || accessKeySecret == "" || bucket == "" {
+		return nil, fmt.Errorf("accessKeyId, accessKeySecret and bucket are required")
 	}
 
-	provider, err := aliyun.NewOSSProvider(accessKeyId, accessKeySecret, region)
+	// Auto-detect bucket region if not specified or to handle cross-region access
+	actualRegion := region
+	if region == "" || region == "cn-hangzhou" {
+		// Try to find the bucket's actual location
+		detectedRegion, err := s.detectBucketRegion(accessKeyId, accessKeySecret, bucket)
+		if err == nil && detectedRegion != "" {
+			actualRegion = detectedRegion
+		}
+	}
+
+	provider, err := aliyun.NewOSSProvider(accessKeyId, accessKeySecret, actualRegion)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize OSS provider: %s", security.SanitizeErrorMessage(err))
 	}
@@ -109,4 +119,31 @@ func (s *OSSService) ListObjects(accessKeyId, accessKeySecret, region, bucket, p
 		Objects:     adapters,
 		IsTruncated: isTruncated,
 	}, nil
+}
+
+// detectBucketRegion finds the actual region of a bucket by listing all buckets.
+func (s *OSSService) detectBucketRegion(accessKeyId, accessKeySecret, bucket string) (string, error) {
+	// Use cn-hangzhou as default to list all buckets (ListBuckets is a global operation)
+	provider, err := aliyun.NewOSSProvider(accessKeyId, accessKeySecret, "cn-hangzhou")
+	if err != nil {
+		return "", err
+	}
+
+	buckets, err := provider.ListBuckets()
+	if err != nil {
+		return "", err
+	}
+
+	for _, b := range buckets {
+		if b.Name == bucket {
+			// Location format is "oss-cn-shenzhen", convert to "cn-shenzhen"
+			location := b.Location
+			if len(location) > 4 && location[:4] == "oss-" {
+				return location[4:], nil
+			}
+			return location, nil
+		}
+	}
+
+	return "", fmt.Errorf("bucket %s not found", bucket)
 }

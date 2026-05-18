@@ -21,7 +21,7 @@ func NewOSSProvider(accessKeyId, accessKeySecret, region string) (*OSSProvider, 
 		AccessKeySecret: tea.String(accessKeySecret),
 		RegionId:        tea.String(region),
 	}
-	config.Endpoint = tea.String(fmt.Sprintf("https://oss-%s.aliyuncs.com", region))
+	config.Endpoint = tea.String(fmt.Sprintf("oss-%s.aliyuncs.com", region))
 
 	client, err := oss.NewClient(config)
 	if err != nil {

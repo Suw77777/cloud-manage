@@ -32,7 +32,7 @@ func NewECSProvider(accessKeyId, accessKeySecret, region string) (*ECSProvider, 
 		AccessKeySecret: tea.String(accessKeySecret),
 		RegionId:        tea.String(region),
 	}
-	config.Endpoint = tea.String(fmt.Sprintf("https://ecs.%s.aliyuncs.com", region))
+	config.Endpoint = tea.String(fmt.Sprintf("ecs.%s.aliyuncs.com", region))
 
 	client, err := ecs.NewClient(config)
 	if err != nil {

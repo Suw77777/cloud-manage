@@ -22,7 +22,7 @@ func NewSLSProvider(accessKeyId, accessKeySecret, region string) (*SLSProvider, 
 		AccessKeySecret: tea.String(accessKeySecret),
 		RegionId:        tea.String(region),
 	}
-	config.Endpoint = tea.String(fmt.Sprintf("https://%s.log.aliyuncs.com", region))
+	config.Endpoint = tea.String(fmt.Sprintf("%s.log.aliyuncs.com", region))
 
 	client, err := sls.NewClient(config)
 	if err != nil {

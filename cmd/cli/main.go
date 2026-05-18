@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-const version = "v0.0.10"
+const version = "v0.0.11"
 
 var (
 	accessKeyId     string
@@ -383,7 +383,9 @@ func handleOSS(action string, args []string) {
 			fmt.Fprintf(os.Stderr, "Usage: cloud-cli oss objects <bucket> [--prefix <prefix>] [--max <count>]\n")
 			os.Exit(1)
 		}
-		bucket := args[0]
+		// Clean bucket name: remove trailing :// or other URL artifacts
+		bucket := strings.TrimSuffix(args[0], "://")
+		bucket = strings.TrimSuffix(bucket, "/")
 		prefix := ""
 		maxKeys := int32(100)
 
