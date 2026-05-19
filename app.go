@@ -377,6 +377,91 @@ func toCMSMetricsView(m service.ECSMetricAdapter) CMSMetricsView {
 	}
 }
 
+// CloudProductView is the frontend-friendly representation of a cloud product.
+type CloudProductView struct {
+	ID        string         `json:"id"`
+	Name      string         `json:"name"`
+	Namespace string         `json:"namespace"`
+	Metrics   []MetricView   `json:"metrics"`
+}
+
+// MetricView is the frontend-friendly representation of a metric.
+type MetricView struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Unit        string `json:"unit"`
+	Description string `json:"description"`
+}
+
+// CloudProductResult is the response type for cloud product queries.
+type CloudProductResult struct {
+	Success  bool               `json:"success"`
+	Message  string             `json:"message"`
+	Products []CloudProductView `json:"products"`
+}
+
+// GetSupportedCloudProducts returns all supported cloud products.
+func (a *App) GetSupportedCloudProducts() CloudProductResult {
+	products := a.cmsSvc.GetSupportedProducts()
+
+	views := make([]CloudProductView, 0, len(products))
+	for _, p := range products {
+		metrics := make([]MetricView, 0, len(p.Metrics))
+		for _, m := range p.Metrics {
+			metrics = append(metrics, MetricView{
+				ID:          m.ID,
+				Name:        m.Name,
+				Unit:        m.Unit,
+				Description: m.Description,
+			})
+		}
+		views = append(views, CloudProductView{
+			ID:        p.ID,
+			Name:      p.Name,
+			Namespace: p.Namespace,
+			Metrics:   metrics,
+		})
+	}
+
+	return CloudProductResult{
+		Success:  true,
+		Message:  fmt.Sprintf("found %d product(s)", len(views)),
+		Products: views,
+	}
+}
+
+// GetCloudProductMetrics returns metrics for a specific product.
+func (a *App) GetCloudProductMetrics(productID string) CloudProductResult {
+	product, err := a.cmsSvc.GetProductMetrics(productID)
+	if err != nil {
+		return CloudProductResult{
+			Success: false,
+			Message: security.SanitizeErrorMessage(err),
+		}
+	}
+
+	metrics := make([]MetricView, 0, len(product.Metrics))
+	for _, m := range product.Metrics {
+		metrics = append(metrics, MetricView{
+			ID:          m.ID,
+			Name:        m.Name,
+			Unit:        m.Unit,
+			Description: m.Description,
+		})
+	}
+
+	return CloudProductResult{
+		Success: true,
+		Message: fmt.Sprintf("found %d metric(s) for %s", len(metrics), productID),
+		Products: []CloudProductView{{
+			ID:        product.ID,
+			Name:      product.Name,
+			Namespace: product.Namespace,
+			Metrics:   metrics,
+		}},
+	}
+}
+
 // SLSLogStoreResult is the response type for SLS Logstore queries.
 type SLSLogStoreResult struct {
 	Success   bool     `json:"success"`

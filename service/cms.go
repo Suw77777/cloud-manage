@@ -15,6 +15,90 @@ func NewCMSService() *CMSService {
 	return &CMSService{}
 }
 
+// CloudProduct represents a cloud product with its monitoring metrics.
+type CloudProduct struct {
+	ID       string          `json:"id"`
+	Name     string          `json:"name"`
+	Namespace string         `json:"namespace"`
+	Metrics  []MetricInfo    `json:"metrics"`
+}
+
+// MetricInfo represents a monitoring metric.
+type MetricInfo struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Unit        string `json:"unit"`
+	Description string `json:"description"`
+}
+
+// GetSupportedProducts returns all supported cloud products and their default metrics.
+func (s *CMSService) GetSupportedProducts() []CloudProduct {
+	return []CloudProduct{
+		{
+			ID:        "ecs",
+			Name:      "云服务器 ECS",
+			Namespace: "acs_ecs_dashboard",
+			Metrics: []MetricInfo{
+				{ID: "CPUUtilization", Name: "CPU 使用率", Unit: "%", Description: "实例 CPU 使用率"},
+				{ID: "memory_usedutilization", Name: "内存使用率", Unit: "%", Description: "实例内存使用率（需安装云监控插件）"},
+				{ID: "DiskReadBPS", Name: "磁盘读速率", Unit: "B/s", Description: "磁盘读取速率"},
+				{ID: "DiskWriteBPS", Name: "磁盘写速率", Unit: "B/s", Description: "磁盘写入速率"},
+				{ID: "InternetInRate", Name: "公网入流量", Unit: "bps", Description: "公网网络流入速率"},
+				{ID: "InternetOutRate", Name: "公网出流量", Unit: "bps", Description: "公网网络流出速率"},
+				{ID: "IntranetInRate", Name: "内网入流量", Unit: "bps", Description: "内网网络流入速率"},
+				{ID: "IntranetOutRate", Name: "内网出流量", Unit: "bps", Description: "内网网络流出速率"},
+			},
+		},
+		{
+			ID:        "rds",
+			Name:      "云数据库 RDS",
+			Namespace: "acs_rds_dashboard",
+			Metrics: []MetricInfo{
+				{ID: "CpuUsage", Name: "CPU 使用率", Unit: "%", Description: "数据库 CPU 使用率"},
+				{ID: "MemoryUsage", Name: "内存使用率", Unit: "%", Description: "数据库内存使用率"},
+				{ID: "DiskUsage", Name: "磁盘使用率", Unit: "%", Description: "磁盘空间使用率"},
+				{ID: "IOPSUsage", Name: "IOPS 使用率", Unit: "%", Description: "IOPS 使用率"},
+				{ID: "ConnectionUsage", Name: "连接数使用率", Unit: "%", Description: "数据库连接数使用率"},
+			},
+		},
+		{
+			ID:        "slb",
+			Name:      "负载均衡 SLB",
+			Namespace: "acs_slb_dashboard",
+			Metrics: []MetricInfo{
+				{ID: "InstanceActiveConnection", Name: "活跃连接数", Unit: "个", Description: "当前活跃连接数"},
+				{ID: "InstanceNewConnection", Name: "新建连接数", Unit: "个/秒", Description: "每秒新建连接数"},
+				{ID: "InstanceTrafficRX", Name: "入流量", Unit: "bytes/s", Description: "接收数据速率"},
+				{ID: "InstanceTrafficTX", Name: "出流量", Unit: "bytes/s", Description: "发送数据速率"},
+				{ID: "InstanceDropTraffic", Name: "丢弃流量", Unit: "bytes/s", Description: "被丢弃的数据速率"},
+			},
+		},
+		{
+			ID:        "redis",
+			Name:      "云数据库 Redis",
+			Namespace: "acs_kvstore",
+			Metrics: []MetricInfo{
+				{ID: "StandardAvgRt", Name: "平均响应时间", Unit: "ms", Description: "平均请求响应时间"},
+				{ID: "StandardMaxRt", Name: "最大响应时间", Unit: "ms", Description: "最大请求响应时间"},
+				{ID: "UsedMemory", Name: "已用内存", Unit: "bytes", Description: "已使用的内存"},
+				{ID: "UsedMemoryRatio", Name: "内存使用率", Unit: "%", Description: "内存使用率"},
+				{ID: "ConnectionUsage", Name: "连接数使用率", Unit: "%", Description: "连接数使用率"},
+			},
+		},
+	}
+}
+
+// GetProductMetrics returns metrics for a specific product.
+func (s *CMSService) GetProductMetrics(productID string) (*CloudProduct, error) {
+	products := s.GetSupportedProducts()
+	for _, p := range products {
+		if p.ID == productID {
+			return &p, nil
+		}
+	}
+	return nil, fmt.Errorf("unsupported product: %s, use 'cms products' to list available products", productID)
+}
+
 // ECSMetricAdapter is a provider-agnostic representation of ECS metrics.
 type ECSMetricAdapter struct {
 	InstanceId         string   `json:"instanceId"`

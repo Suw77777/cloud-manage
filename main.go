@@ -18,7 +18,7 @@ import (
 //go:embed all:frontend/dist
 var assets embed.FS
 
-const version = "v0.0.9"
+const version = "v0.0.12"
 
 var (
 	accessKeyId     string

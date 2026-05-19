@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-const version = "v0.0.11"
+const version = "v0.0.12"
 
 var (
 	accessKeyId     string
@@ -248,16 +248,53 @@ func handleECS(action string, args []string) {
 // ========== CMS ==========
 
 func handleCMS(action string, args []string) {
-	svc := service.NewCMSService()
+	cmsSvc := service.NewCMSService()
 
 	switch action {
+	case "products":
+		products := cmsSvc.GetSupportedProducts()
+		if outputJSON {
+			printJSON(products)
+		} else {
+			printCMSProducts(products)
+		}
+
 	case "metrics":
 		if len(args) < 1 {
-			fmt.Fprintf(os.Stderr, "Usage: cloud-cli cms metrics <instance-id>\n")
+			fmt.Fprintf(os.Stderr, "Usage: cloud-manage cms metrics <product>\n")
+			fmt.Fprintf(os.Stderr, "Example: cloud-manage cms metrics ecs\n")
+			fmt.Fprintf(os.Stderr, "\nUse 'cloud-manage cms products' to list available products.\n")
+			os.Exit(1)
+		}
+		productID := args[0]
+
+		if productID == "ecs" {
+			// List ECS instances with basic info
+			ecsSvc := service.NewECSService()
+			result, err := ecsSvc.ListInstances(accessKeyId, accessKeySecret, region)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+				os.Exit(1)
+			}
+			if outputJSON {
+				printJSON(result)
+			} else {
+				printECSInstancesForCMS(result.Instances)
+			}
+		} else {
+			fmt.Fprintf(os.Stderr, "Currently only 'ecs' product is supported for listing.\n")
+			fmt.Fprintf(os.Stderr, "Use 'cloud-manage cms products' to see all supported products.\n")
+			os.Exit(1)
+		}
+
+	case "query":
+		if len(args) < 1 {
+			fmt.Fprintf(os.Stderr, "Usage: cloud-manage cms query <instance-id>\n")
 			os.Exit(1)
 		}
 		instanceId := args[0]
-		result, err := svc.GetInstanceMetrics(accessKeyId, accessKeySecret, region, instanceId)
+
+		result, err := cmsSvc.GetInstanceMetrics(accessKeyId, accessKeySecret, region, instanceId)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
@@ -265,12 +302,14 @@ func handleCMS(action string, args []string) {
 		if outputJSON {
 			printJSON(result)
 		} else {
-			printMetrics(*result)
+			printCMSQueryResult(instanceId, result)
 		}
 
 	default:
 		fmt.Println(`CMS Actions:
-  metrics <id>      查询实例监控指标`)
+  products                          列出支持的云产品
+  metrics ecs                       列出 ECS 实例
+  query <instance-id>               查询实例监控数据`)
 	}
 }
 
@@ -502,6 +541,65 @@ func printMetrics(m service.ECSMetricAdapter) {
 		fmt.Printf("  Internet TX:         %.2f bps\n", *m.InternetTX)
 	}
 	fmt.Printf("  Update Time:         %s\n", m.UpdateTime)
+}
+
+func printCMSProducts(products []service.CloudProduct) {
+	fmt.Printf("\n支持的云产品:\n\n")
+	for _, p := range products {
+		fmt.Printf("  %-10s %s\n", p.ID, p.Name)
+		fmt.Printf("             指标数量: %d\n", len(p.Metrics))
+	}
+	fmt.Printf("\n使用 'cloud-manage cms metrics <product>' 查看实例列表\n")
+}
+
+func printECSInstancesForCMS(instances []service.ECSInstanceAdapter) {
+	fmt.Printf("\nECS 实例列表:\n\n")
+	if len(instances) == 0 {
+		fmt.Println("  无实例")
+		return
+	}
+	fmt.Printf("  %-20s %-12s %-20s %-15s %-15s\n", "实例ID", "状态", "名称", "公网IP", "内网IP")
+	fmt.Printf("  %s\n", strings.Repeat("-", 82))
+	for _, inst := range instances {
+		status := "运行中"
+		if inst.Status != "Running" {
+			status = inst.Status
+		}
+		publicIP := inst.PublicIp
+		if publicIP == "" {
+			publicIP = "-"
+		}
+		privateIP := inst.PrivateIp
+		if privateIP == "" {
+			privateIP = "-"
+		}
+		fmt.Printf("  %-20s %-12s %-20s %-15s %-15s\n",
+			inst.InstanceId, status, inst.InstanceName, publicIP, privateIP)
+	}
+	fmt.Printf("\n使用 'cloud-manage cms query <instance-id>' 查看监控数据\n")
+}
+
+func printCMSQueryResult(instanceId string, m *service.ECSMetricAdapter) {
+	fmt.Printf("\n实例 %s 监控数据:\n\n", instanceId)
+	if m.CPUUtilization != nil {
+		fmt.Printf("  CPU 使用率:       %.2f%%\n", *m.CPUUtilization)
+	}
+	if m.MemoryUtilization != nil {
+		fmt.Printf("  内存使用率:       %.2f%%\n", *m.MemoryUtilization)
+	}
+	if m.DiskReadBPS != nil {
+		fmt.Printf("  磁盘读速率:       %.2f B/s\n", *m.DiskReadBPS)
+	}
+	if m.DiskWriteBPS != nil {
+		fmt.Printf("  磁盘写速率:       %.2f B/s\n", *m.DiskWriteBPS)
+	}
+	if m.InternetRX != nil {
+		fmt.Printf("  公网入流量:       %.2f bps\n", *m.InternetRX)
+	}
+	if m.InternetTX != nil {
+		fmt.Printf("  公网出流量:       %.2f bps\n", *m.InternetTX)
+	}
+	fmt.Printf("\n  更新时间:         %s\n", m.UpdateTime)
 }
 
 func printLogs(result *service.LogQueryResult) {
