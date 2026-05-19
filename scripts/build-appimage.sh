@@ -1,5 +1,5 @@
 #!/bin/bash
-# Build AppImage for Cloud Manage
+# Build AppImage for Cloud Manage CLI
 # Usage: ./scripts/build-appimage.sh
 
 set -e
@@ -10,45 +10,19 @@ ARCH="x86_64"
 
 echo "Building ${APP_NAME} AppImage..."
 
-# Build the application first
-echo "Building application..."
-wails build
+# Build CLI binary
+echo "Building CLI binary..."
+CGO_ENABLED=0 go build -o "build/bin/${APP_NAME}" ./cmd/cli/
 
 # Create AppDir structure
 APPDIR="build/AppDir"
 rm -rf "${APPDIR}"
 mkdir -p "${APPDIR}/usr/bin"
-mkdir -p "${APPDIR}/usr/lib"
 mkdir -p "${APPDIR}/usr/share/applications"
 mkdir -p "${APPDIR}/usr/share/icons/hicolor/256x256/apps"
 
 # Copy binary
 cp "build/bin/${APP_NAME}" "${APPDIR}/usr/bin/"
-
-# Copy required shared libraries
-echo "Copying shared libraries..."
-LIBS=(
-    "libwebkit2gtk-4.0.so.37"
-    "libjavascriptcoregtk-4.0.so.18"
-    "libgtk-3.so.0"
-    "libgdk-3.so.0"
-    "libgdk_pixbuf-2.0.so.0"
-    "libpango-1.0.so.0"
-    "libpangocairo-1.0.so.0"
-    "libcairo.so.2"
-    "libatk-1.0.so.0"
-    "libatk-bridge-2.0.so.0"
-    "libglib-2.0.so.0"
-    "libgio-2.0.so.0"
-    "libgobject-2.0.so.0"
-)
-
-for lib in "${LIBS[@]}"; do
-    lib_path=$(ldconfig -p 2>/dev/null | grep "${lib}" | head -1 | awk '{print $NF}')
-    if [ -n "${lib_path}" ] && [ -f "${lib_path}" ]; then
-        cp -L "${lib_path}" "${APPDIR}/usr/lib/"
-    fi
-done
 
 # Create desktop file
 cat > "${APPDIR}/usr/share/applications/${APP_NAME}.desktop" << EOF
@@ -57,32 +31,46 @@ Name=Cloud Manage
 Comment=阿里云资源管理工具
 Exec=${APP_NAME}
 Icon=${APP_NAME}
-Terminal=false
+Terminal=true
 Type=Application
 Categories=Utility;
 EOF
 
-# Copy icon if exists
-if [ -f "frontend/src/assets/images/logo.png" ]; then
-    cp "frontend/src/assets/images/logo.png" "${APPDIR}/usr/share/icons/hicolor/256x256/apps/${APP_NAME}.png"
-else
-    # Create a simple placeholder icon
-    convert -size 256x256 xc:blue -fill white -gravity center -pointsize 40 -annotate 0 "CM" \
-        "${APPDIR}/usr/share/icons/hicolor/256x256/apps/${APP_NAME}.png" 2>/dev/null || true
-fi
+# Create icon directory and copy icon
+mkdir -p "${APPDIR}/usr/share/icons/hicolor/256x256/apps"
 
-# Copy desktop file to AppDir root
+# Create a simple PNG icon using python
+python3 -c "
+import struct, zlib
+def create_png():
+    width, height = 256, 256
+    ihdr_data = struct.pack('>IIBBBBB', width, height, 8, 2, 0, 0, 0)
+    ihdr_crc = zlib.crc32(b'IHDR' + ihdr_data) & 0xffffffff
+    ihdr = struct.pack('>I', 13) + b'IHDR' + ihdr_data + struct.pack('>I', ihdr_crc)
+    raw_data = b''
+    for y in range(height):
+        raw_data += b'\x00'
+        for x in range(width):
+            raw_data += b'\x18\x90\xff'
+    compressed = zlib.compress(raw_data)
+    idat_crc = zlib.crc32(b'IDAT' + compressed) & 0xffffffff
+    idat = struct.pack('>I', len(compressed)) + b'IDAT' + compressed + struct.pack('>I', idat_crc)
+    iend_crc = zlib.crc32(b'IEND') & 0xffffffff
+    iend = struct.pack('>I', 0) + b'IEND' + struct.pack('>I', iend_crc)
+    return b'\x89PNG\r\n\x1a\n' + ihdr + idat + iend
+with open('${APPDIR}/usr/share/icons/hicolor/256x256/apps/${APP_NAME}.png', 'wb') as f:
+    f.write(create_png())
+"
+
+# Copy desktop file and icon to AppDir root
 cp "${APPDIR}/usr/share/applications/${APP_NAME}.desktop" "${APPDIR}/"
-# Copy icon to AppDir root
-cp "${APPDIR}/usr/share/icons/hicolor/256x256/apps/${APP_NAME}.png" "${APPDIR}/" 2>/dev/null || true
+cp "${APPDIR}/usr/share/icons/hicolor/256x256/apps/${APP_NAME}.png" "${APPDIR}/"
 
 # Create AppRun
 cat > "${APPDIR}/AppRun" << 'EOF'
 #!/bin/bash
 SELF=$(readlink -f "$0")
 HERE=${SELF%/*}
-export PATH="${HERE}/usr/bin/:${PATH}"
-export LD_LIBRARY_PATH="${HERE}/usr/lib/:${LD_LIBRARY_PATH}"
 exec "${HERE}/usr/bin/cloud-manage" "$@"
 EOF
 chmod +x "${APPDIR}/AppRun"

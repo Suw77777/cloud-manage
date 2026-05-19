@@ -90,6 +90,13 @@ func (p *OSSProvider) ListBuckets() ([]OSSBucket, error) {
 
 // ListObjects lists objects in an OSS bucket.
 func (p *OSSProvider) ListObjects(bucket, prefix string, maxKeys int32) ([]OSSObject, bool, error) {
+	// Limit maxKeys to prevent excessive memory usage
+	if maxKeys > 1000 {
+		maxKeys = 1000
+	}
+	if maxKeys < 1 {
+		maxKeys = 100
+	}
 	request := &oss.ListObjectsV2Request{
 		MaxKeys: tea.Int64(int64(maxKeys)),
 	}

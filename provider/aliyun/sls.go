@@ -71,6 +71,13 @@ func (p *SLSProvider) ListLogStores(project string) ([]string, error) {
 
 // GetLogs queries logs from a Logstore.
 func (p *SLSProvider) GetLogs(project, logstore, query string, from, to int64, maxLines int64) ([]LogEntry, int64, error) {
+	// Limit maxLines to prevent excessive memory usage
+	if maxLines > 10000 {
+		maxLines = 10000
+	}
+	if maxLines < 1 {
+		maxLines = 100
+	}
 	request := &sls.GetLogsRequest{
 		From:    tea.Int32(int32(from)),
 		To:      tea.Int32(int32(to)),
