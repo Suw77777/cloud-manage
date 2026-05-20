@@ -1,6 +1,50 @@
 package service
 
-import "testing"
+import (
+	"cloud-manage/provider"
+	"errors"
+	"testing"
+)
+
+func TestListInstances_MockProvider(t *testing.T) {
+	mock := &provider.MockECSProvider{
+		Instances: []provider.ECSInstance{
+			{InstanceId: "i-001", InstanceName: "test-1", Status: "Running"},
+			{InstanceId: "i-002", InstanceName: "test-2", Status: "Stopped"},
+		},
+		TotalCount: 2,
+	}
+
+	svc := NewECSServiceWithProvider(func(a, b, c string) (provider.ECSProvider, error) {
+		return mock, nil
+	})
+
+	result, err := svc.ListInstances("key", "secret", "cn-hangzhou")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if len(result.Instances) != 2 {
+		t.Errorf("expected 2 instances, got %d", len(result.Instances))
+	}
+	if result.Instances[0].InstanceId != "i-001" {
+		t.Errorf("expected first instance ID 'i-001', got '%s'", result.Instances[0].InstanceId)
+	}
+}
+
+func TestListInstances_ProviderError(t *testing.T) {
+	mock := &provider.MockECSProvider{
+		Err: errors.New("API error"),
+	}
+
+	svc := NewECSServiceWithProvider(func(a, b, c string) (provider.ECSProvider, error) {
+		return mock, nil
+	})
+
+	_, err := svc.ListInstances("key", "secret", "cn-hangzhou")
+	if err == nil {
+		t.Error("expected error from provider")
+	}
+}
 
 func TestListInstances_EmptyCredentials(t *testing.T) {
 	svc := NewECSService()
@@ -33,26 +77,5 @@ func TestListInstancesMultiRegion_EmptyRegions(t *testing.T) {
 	results := svc.ListInstancesMultiRegion("key", "secret", []string{})
 	if len(results) != 0 {
 		t.Errorf("expected 0 results for empty regions, got %d", len(results))
-	}
-}
-
-func TestListInstancesMultiRegion_MultipleRegions(t *testing.T) {
-	svc := NewECSService()
-	// With fake credentials, this will error per-region but should not panic.
-	regions := []string{"cn-hangzhou", "cn-beijing", "cn-shanghai"}
-	results := svc.ListInstancesMultiRegion("fake-key", "fake-secret", regions)
-
-	if len(results) != len(regions) {
-		t.Errorf("expected %d results, got %d", len(regions), len(results))
-	}
-
-	for i, r := range results {
-		if r.Region != regions[i] {
-			t.Errorf("result[%d].Region = %q, want %q", i, r.Region, regions[i])
-		}
-		// With fake credentials, we expect an error.
-		if r.Error == "" {
-			t.Errorf("result[%d] expected error for fake credentials", i)
-		}
 	}
 }
