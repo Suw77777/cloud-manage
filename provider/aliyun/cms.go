@@ -1,6 +1,7 @@
 package aliyun
 
 import (
+	"cloud-manage/provider"
 	"fmt"
 	"time"
 
@@ -85,21 +86,9 @@ func (p *CMSProvider) DescribeMetricLast(namespace, metricName, instanceId strin
 	return results, nil
 }
 
-// ECSMetricData holds metric data for an ECS instance.
-type ECSMetricData struct {
-	InstanceId   string       `json:"instanceId"`
-	CPUUtilization *float64   `json:"cpuUtilization,omitempty"`
-	MemoryUtilization *float64 `json:"memoryUtilization,omitempty"`
-	DiskReadBPS  *float64     `json:"diskReadBps,omitempty"`
-	DiskWriteBPS *float64     `json:"diskWriteBps,omitempty"`
-	InternetRX   *float64     `json:"internetRx,omitempty"`
-	InternetTX   *float64     `json:"internetTx,omitempty"`
-	UpdateTime   string       `json:"updateTime"`
-}
-
 // GetECSMetrics retrieves key metrics for an ECS instance.
-func (p *CMSProvider) GetECSMetrics(instanceId string) (*ECSMetricData, error) {
-	metrics := &ECSMetricData{
+func (p *CMSProvider) GetECSMetrics(instanceId string) (*provider.ECSMetricData, error) {
+	metrics := &provider.ECSMetricData{
 		InstanceId: instanceId,
 		UpdateTime: time.Now().Format(time.RFC3339),
 	}

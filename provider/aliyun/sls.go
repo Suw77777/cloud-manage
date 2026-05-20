@@ -1,6 +1,7 @@
 package aliyun
 
 import (
+	"cloud-manage/provider"
 	"fmt"
 	"time"
 
@@ -31,19 +32,6 @@ func NewSLSProvider(accessKeyId, accessKeySecret, region string) (*SLSProvider, 
 	return &SLSProvider{client: client, region: region}, nil
 }
 
-// LogStore represents an SLS Logstore.
-type LogStore struct {
-	LogstoreName string `json:"logstoreName"`
-	TTL          int32  `json:"ttl"`
-	ShardCount   int32  `json:"shardCount"`
-}
-
-// LogEntry represents a single log entry.
-type LogEntry struct {
-	Timestamp int64             `json:"timestamp"`
-	Content   map[string]string `json:"content"`
-}
-
 // ListLogStores lists all Logstores in a project.
 func (p *SLSProvider) ListLogStores(project string) ([]string, error) {
 	request := &sls.ListLogStoresRequest{
@@ -70,8 +58,7 @@ func (p *SLSProvider) ListLogStores(project string) ([]string, error) {
 }
 
 // GetLogs queries logs from a Logstore.
-func (p *SLSProvider) GetLogs(project, logstore, query string, from, to int64, maxLines int64) ([]LogEntry, int64, error) {
-	// Limit maxLines to prevent excessive memory usage
+func (p *SLSProvider) GetLogs(project, logstore, query string, from, to int64, maxLines int64) ([]provider.LogEntry, int64, error) {
 	if maxLines > 10000 {
 		maxLines = 10000
 	}
@@ -93,12 +80,12 @@ func (p *SLSProvider) GetLogs(project, logstore, query string, from, to int64, m
 
 	body := response.Body
 	if body == nil {
-		return []LogEntry{}, 0, nil
+		return []provider.LogEntry{}, 0, nil
 	}
 
-	entries := make([]LogEntry, 0)
+	entries := make([]provider.LogEntry, 0)
 	for _, log := range body {
-		entry := LogEntry{
+		entry := provider.LogEntry{
 			Timestamp: time.Now().UnixMilli(),
 			Content:   make(map[string]string),
 		}
@@ -142,7 +129,6 @@ func (p *SLSProvider) GetHistograms(project, logstore, query string, from, to in
 	}
 
 	histograms := make([]LogHistogram, 0)
-	// Response body is a slice of histogram objects
 	for _, h := range body {
 		hist := LogHistogram{}
 		if h.Count != nil {

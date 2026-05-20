@@ -1,26 +1,41 @@
 package service
 
 import (
+	"cloud-manage/provider"
 	"cloud-manage/provider/aliyun"
 	"cloud-manage/security"
 	"fmt"
 	"sync"
 )
 
-// CMSService handles CloudMonitor business logic.
-type CMSService struct{}
+// CMSProviderFactory creates a CMSProvider given credentials and region.
+type CMSProviderFactory func(accessKeyId, accessKeySecret, region string) (provider.CMSProvider, error)
 
-// NewCMSService creates a new CMSService.
+// CMSService handles CloudMonitor business logic.
+type CMSService struct {
+	providerFactory CMSProviderFactory
+}
+
+// NewCMSService creates a new CMSService with default provider factory.
 func NewCMSService() *CMSService {
-	return &CMSService{}
+	return &CMSService{
+		providerFactory: func(accessKeyId, accessKeySecret, region string) (provider.CMSProvider, error) {
+			return aliyun.NewCMSProvider(accessKeyId, accessKeySecret, region)
+		},
+	}
+}
+
+// NewCMSServiceWithProvider creates a new CMSService with custom provider factory (for testing).
+func NewCMSServiceWithProvider(factory CMSProviderFactory) *CMSService {
+	return &CMSService{providerFactory: factory}
 }
 
 // CloudProduct represents a cloud product with its monitoring metrics.
 type CloudProduct struct {
-	ID       string          `json:"id"`
-	Name     string          `json:"name"`
-	Namespace string         `json:"namespace"`
-	Metrics  []MetricInfo    `json:"metrics"`
+	ID        string       `json:"id"`
+	Name      string       `json:"name"`
+	Namespace string       `json:"namespace"`
+	Metrics   []MetricInfo `json:"metrics"`
 }
 
 // MetricInfo represents a monitoring metric.
@@ -101,21 +116,21 @@ func (s *CMSService) GetProductMetrics(productID string) (*CloudProduct, error) 
 
 // ECSMetricAdapter is a provider-agnostic representation of ECS metrics.
 type ECSMetricAdapter struct {
-	InstanceId         string   `json:"instanceId"`
-	CPUUtilization     *float64 `json:"cpuUtilization,omitempty"`
-	MemoryUtilization  *float64 `json:"memoryUtilization,omitempty"`
-	DiskReadBPS        *float64 `json:"diskReadBps,omitempty"`
-	DiskWriteBPS       *float64 `json:"diskWriteBps,omitempty"`
-	InternetRX         *float64 `json:"internetRx,omitempty"`
-	InternetTX         *float64 `json:"internetTx,omitempty"`
-	UpdateTime         string   `json:"updateTime"`
+	InstanceId        string   `json:"instanceId"`
+	CPUUtilization    *float64 `json:"cpuUtilization,omitempty"`
+	MemoryUtilization *float64 `json:"memoryUtilization,omitempty"`
+	DiskReadBPS       *float64 `json:"diskReadBps,omitempty"`
+	DiskWriteBPS      *float64 `json:"diskWriteBps,omitempty"`
+	InternetRX        *float64 `json:"internetRx,omitempty"`
+	InternetTX        *float64 `json:"internetTx,omitempty"`
+	UpdateTime        string   `json:"updateTime"`
 }
 
 // RegionMetricsResult holds the metrics result for a single region.
 type RegionMetricsResult struct {
-	Region  string              `json:"region"`
-	Metrics []ECSMetricAdapter  `json:"metrics"`
-	Error   string              `json:"error,omitempty"`
+	Region  string             `json:"region"`
+	Metrics []ECSMetricAdapter `json:"metrics"`
+	Error   string             `json:"error,omitempty"`
 }
 
 // GetInstanceMetrics queries metrics for a single ECS instance.
@@ -124,12 +139,12 @@ func (s *CMSService) GetInstanceMetrics(accessKeyId, accessKeySecret, region, in
 		return nil, fmt.Errorf("accessKeyId, accessKeySecret, region and instanceId are required")
 	}
 
-	provider, err := aliyun.NewCMSProvider(accessKeyId, accessKeySecret, region)
+	p, err := s.providerFactory(accessKeyId, accessKeySecret, region)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize CMS provider: %s", security.SanitizeErrorMessage(err))
 	}
 
-	metrics, err := provider.GetECSMetrics(instanceId)
+	metrics, err := p.GetECSMetrics(instanceId)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get metrics: %s", security.SanitizeErrorMessage(err))
 	}
@@ -148,7 +163,6 @@ func (s *CMSService) GetInstanceMetrics(accessKeyId, accessKeySecret, region, in
 
 // GetInstanceMetricsMultiRegion queries metrics for multiple instances across regions.
 func (s *CMSService) GetInstanceMetricsMultiRegion(accessKeyId, accessKeySecret string, instances []InstanceRegionPair) []RegionMetricsResult {
-	// Group instances by region
 	regionInstances := make(map[string][]string)
 	for _, inst := range instances {
 		regionInstances[inst.Region] = append(regionInstances[inst.Region], inst.InstanceId)
@@ -172,7 +186,6 @@ func (s *CMSService) GetInstanceMetricsMultiRegion(accessKeyId, accessKeySecret 
 					if firstError == "" {
 						firstError = security.SanitizeErrorMessage(err)
 					}
-					// Still add the instance with error
 					metrics = append(metrics, ECSMetricAdapter{
 						InstanceId: id,
 						UpdateTime: "",

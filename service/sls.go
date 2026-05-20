@@ -1,35 +1,32 @@
 package service
 
 import (
+	"cloud-manage/provider"
 	"cloud-manage/provider/aliyun"
 	"cloud-manage/security"
 	"fmt"
 )
 
+// SLSProviderFactory creates an SLSProvider given credentials and region.
+type SLSProviderFactory func(accessKeyId, accessKeySecret, region string) (provider.SLSProvider, error)
+
 // SLSService handles SLS business logic.
-type SLSService struct{}
+type SLSService struct {
+	providerFactory SLSProviderFactory
+}
 
-// NewSLSService creates a new SLSService.
+// NewSLSService creates a new SLSService with default provider factory.
 func NewSLSService() *SLSService {
-	return &SLSService{}
+	return &SLSService{
+		providerFactory: func(accessKeyId, accessKeySecret, region string) (provider.SLSProvider, error) {
+			return aliyun.NewSLSProvider(accessKeyId, accessKeySecret, region)
+		},
+	}
 }
 
-// LogProjectAdapter is a provider-agnostic representation of an SLS project.
-type LogProjectAdapter struct {
-	ProjectName string `json:"projectName"`
-	Description string `json:"description"`
-	Region      string `json:"region"`
-	CreateTime  string `json:"createTime"`
-	Status      string `json:"status"`
-}
-
-// LogStoreAdapter is a provider-agnostic representation of an SLS Logstore.
-type LogStoreAdapter struct {
-	LogstoreName string `json:"logstoreName"`
-	TTL          int32  `json:"ttl"`
-	ShardCount   int32  `json:"shardCount"`
-	CreateTime   string `json:"createTime"`
-	ModifyTime   string `json:"modifyTime"`
+// NewSLSServiceWithProvider creates a new SLSService with custom provider factory (for testing).
+func NewSLSServiceWithProvider(factory SLSProviderFactory) *SLSService {
+	return &SLSService{providerFactory: factory}
 }
 
 // LogEntryAdapter is a provider-agnostic representation of a log entry.
@@ -51,12 +48,12 @@ func (s *SLSService) ListLogStores(accessKeyId, accessKeySecret, region, project
 		return nil, fmt.Errorf("accessKeyId, accessKeySecret, region and project are required")
 	}
 
-	provider, err := aliyun.NewSLSProvider(accessKeyId, accessKeySecret, region)
+	p, err := s.providerFactory(accessKeyId, accessKeySecret, region)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize SLS provider: %s", security.SanitizeErrorMessage(err))
 	}
 
-	logstores, err := provider.ListLogStores(project)
+	logstores, err := p.ListLogStores(project)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list logstores: %s", security.SanitizeErrorMessage(err))
 	}
@@ -70,12 +67,12 @@ func (s *SLSService) QueryLogs(accessKeyId, accessKeySecret, region, project, lo
 		return nil, fmt.Errorf("accessKeyId, accessKeySecret, region, project and logstore are required")
 	}
 
-	provider, err := aliyun.NewSLSProvider(accessKeyId, accessKeySecret, region)
+	p, err := s.providerFactory(accessKeyId, accessKeySecret, region)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize SLS provider: %s", security.SanitizeErrorMessage(err))
 	}
 
-	entries, count, err := provider.GetLogs(project, logstore, query, from, to, maxLines)
+	entries, count, err := p.GetLogs(project, logstore, query, from, to, maxLines)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query logs: %s", security.SanitizeErrorMessage(err))
 	}

@@ -1,22 +1,36 @@
 package service
 
 import (
+	"cloud-manage/provider"
 	"cloud-manage/provider/aliyun"
 	"cloud-manage/security"
 	"fmt"
 	"sync"
 )
 
-// ECSService handles ECS business logic.
-type ECSService struct{}
+// ECSProviderFactory creates an ECSProvider given credentials and region.
+type ECSProviderFactory func(accessKeyId, accessKeySecret, region string) (provider.ECSProvider, error)
 
-// NewECSService creates a new ECSService.
+// ECSService handles ECS business logic.
+type ECSService struct {
+	providerFactory ECSProviderFactory
+}
+
+// NewECSService creates a new ECSService with default provider factory.
 func NewECSService() *ECSService {
-	return &ECSService{}
+	return &ECSService{
+		providerFactory: func(accessKeyId, accessKeySecret, region string) (provider.ECSProvider, error) {
+			return aliyun.NewECSProvider(accessKeyId, accessKeySecret, region)
+		},
+	}
+}
+
+// NewECSServiceWithProvider creates a new ECSService with custom provider factory (for testing).
+func NewECSServiceWithProvider(factory ECSProviderFactory) *ECSService {
+	return &ECSService{providerFactory: factory}
 }
 
 // ECSInstanceAdapter is a provider-agnostic representation of an ECS instance.
-// Used by app.go to avoid direct dependency on provider/aliyun.
 type ECSInstanceAdapter struct {
 	InstanceId   string
 	InstanceName string
@@ -42,8 +56,8 @@ type RegionResult struct {
 	Error      string               `json:"error,omitempty"`
 }
 
-// toAdapters converts aliyun.ECSInstance slice to ECSInstanceAdapter slice.
-func toAdapters(instances []aliyun.ECSInstance) []ECSInstanceAdapter {
+// toAdapters converts provider.ECSInstance slice to ECSInstanceAdapter slice.
+func toAdapters(instances []provider.ECSInstance) []ECSInstanceAdapter {
 	adapters := make([]ECSInstanceAdapter, 0, len(instances))
 	for _, inst := range instances {
 		adapters = append(adapters, ECSInstanceAdapter{
@@ -61,19 +75,17 @@ func toAdapters(instances []aliyun.ECSInstance) []ECSInstanceAdapter {
 }
 
 // ListInstances queries ECS instances for a single region.
-// accessKeyId, accessKeySecret, and region are passed from the GUI layer.
-// They are NOT stored anywhere after this call returns.
 func (s *ECSService) ListInstances(accessKeyId, accessKeySecret, region string) (*ListInstancesResult, error) {
 	if accessKeyId == "" || accessKeySecret == "" || region == "" {
 		return nil, fmt.Errorf("accessKeyId, accessKeySecret and region are required")
 	}
 
-	provider, err := aliyun.NewECSProvider(accessKeyId, accessKeySecret, region)
+	p, err := s.providerFactory(accessKeyId, accessKeySecret, region)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize ECS provider: %s", security.SanitizeErrorMessage(err))
 	}
 
-	instances, total, err := provider.DescribeInstances(1, 50)
+	instances, total, err := p.DescribeInstances(1, 50)
 	if err != nil {
 		return nil, fmt.Errorf("failed to describe instances: %s", security.SanitizeErrorMessage(err))
 	}
@@ -112,12 +124,12 @@ func (s *ECSService) GetInstanceDetail(accessKeyId, accessKeySecret, region, ins
 		return nil, fmt.Errorf("accessKeyId, accessKeySecret, region and instanceId are required")
 	}
 
-	provider, err := aliyun.NewECSProvider(accessKeyId, accessKeySecret, region)
+	p, err := s.providerFactory(accessKeyId, accessKeySecret, region)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize ECS provider: %s", security.SanitizeErrorMessage(err))
 	}
 
-	detail, err := provider.DescribeInstanceDetail(instanceId)
+	detail, err := p.DescribeInstanceDetail(instanceId)
 	if err != nil {
 		return nil, fmt.Errorf("failed to describe instance: %s", security.SanitizeErrorMessage(err))
 	}
@@ -150,12 +162,12 @@ func (s *ECSService) StartInstance(accessKeyId, accessKeySecret, region, instanc
 		return fmt.Errorf("accessKeyId, accessKeySecret, region and instanceId are required")
 	}
 
-	provider, err := aliyun.NewECSProvider(accessKeyId, accessKeySecret, region)
+	p, err := s.providerFactory(accessKeyId, accessKeySecret, region)
 	if err != nil {
 		return fmt.Errorf("failed to initialize ECS provider: %s", security.SanitizeErrorMessage(err))
 	}
 
-	if err := provider.StartInstance(instanceId); err != nil {
+	if err := p.StartInstance(instanceId); err != nil {
 		return fmt.Errorf("failed to start instance: %s", security.SanitizeErrorMessage(err))
 	}
 	return nil
@@ -167,12 +179,12 @@ func (s *ECSService) StopInstance(accessKeyId, accessKeySecret, region, instance
 		return fmt.Errorf("accessKeyId, accessKeySecret, region and instanceId are required")
 	}
 
-	provider, err := aliyun.NewECSProvider(accessKeyId, accessKeySecret, region)
+	p, err := s.providerFactory(accessKeyId, accessKeySecret, region)
 	if err != nil {
 		return fmt.Errorf("failed to initialize ECS provider: %s", security.SanitizeErrorMessage(err))
 	}
 
-	if err := provider.StopInstance(instanceId, forceStop); err != nil {
+	if err := p.StopInstance(instanceId, forceStop); err != nil {
 		return fmt.Errorf("failed to stop instance: %s", security.SanitizeErrorMessage(err))
 	}
 	return nil
@@ -184,20 +196,18 @@ func (s *ECSService) RebootInstance(accessKeyId, accessKeySecret, region, instan
 		return fmt.Errorf("accessKeyId, accessKeySecret, region and instanceId are required")
 	}
 
-	provider, err := aliyun.NewECSProvider(accessKeyId, accessKeySecret, region)
+	p, err := s.providerFactory(accessKeyId, accessKeySecret, region)
 	if err != nil {
 		return fmt.Errorf("failed to initialize ECS provider: %s", security.SanitizeErrorMessage(err))
 	}
 
-	if err := provider.RebootInstance(instanceId, forceStop); err != nil {
+	if err := p.RebootInstance(instanceId, forceStop); err != nil {
 		return fmt.Errorf("failed to reboot instance: %s", security.SanitizeErrorMessage(err))
 	}
 	return nil
 }
 
 // ListInstancesMultiRegion queries ECS instances for multiple regions concurrently.
-// Each region is queried in its own goroutine. Errors for individual regions
-// are captured per-region and do not fail the entire batch.
 func (s *ECSService) ListInstancesMultiRegion(accessKeyId, accessKeySecret string, regions []string) []RegionResult {
 	results := make([]RegionResult, len(regions))
 	var wg sync.WaitGroup

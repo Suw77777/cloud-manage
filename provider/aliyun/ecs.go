@@ -1,24 +1,13 @@
 package aliyun
 
 import (
+	"cloud-manage/provider"
 	"fmt"
 
 	ecs "github.com/alibabacloud-go/ecs-20140526/v4/client"
 	openapi "github.com/alibabacloud-go/darabonba-openapi/v2/client"
 	"github.com/alibabacloud-go/tea/tea"
 )
-
-// ECSInstance represents an ECS instance for the application layer.
-type ECSInstance struct {
-	InstanceId   string `json:"instanceId"`
-	InstanceName string `json:"instanceName"`
-	Status       string `json:"status"`
-	RegionId     string `json:"regionId"`
-	ZoneId       string `json:"zoneId"`
-	PublicIp     string `json:"publicIp"`
-	PrivateIp    string `json:"privateIp"`
-	CreationTime string `json:"creationTime"`
-}
 
 // ECSProvider wraps the Aliyun ECS SDK client.
 type ECSProvider struct {
@@ -41,30 +30,8 @@ func NewECSProvider(accessKeyId, accessKeySecret, region string) (*ECSProvider, 
 	return &ECSProvider{client: client}, nil
 }
 
-// InstanceDetail holds detailed information about an ECS instance.
-type InstanceDetail struct {
-	InstanceId       string   `json:"instanceId"`
-	InstanceName     string   `json:"instanceName"`
-	Description      string   `json:"description"`
-	HostName         string   `json:"hostName"`
-	Status           string   `json:"status"`
-	RegionId         string   `json:"regionId"`
-	ZoneId           string   `json:"zoneId"`
-	InstanceType     string   `json:"instanceType"`
-	Cpu              int32    `json:"cpu"`
-	Memory           int32    `json:"memory"`
-	ImageId          string   `json:"imageId"`
-	InternetChargeType string `json:"internetChargeType"`
-	CreationTime     string   `json:"creationTime"`
-	ExpiredTime      string   `json:"expiredTime"`
-	StoppedMode      string   `json:"stoppedMode"`
-	PublicIp         []string `json:"publicIp"`
-	PrivateIp        []string `json:"privateIp"`
-	SecurityGroupIds []string `json:"securityGroupIds"`
-}
-
 // DescribeInstanceDetail queries detailed information for a single ECS instance.
-func (p *ECSProvider) DescribeInstanceDetail(instanceId string) (*InstanceDetail, error) {
+func (p *ECSProvider) DescribeInstanceDetail(instanceId string) (*provider.InstanceDetail, error) {
 	request := &ecs.DescribeInstanceAttributeRequest{
 		InstanceId: tea.String(instanceId),
 	}
@@ -100,7 +67,7 @@ func (p *ECSProvider) DescribeInstanceDetail(instanceId string) (*InstanceDetail
 		}
 	}
 
-	return &InstanceDetail{
+	return &provider.InstanceDetail{
 		InstanceId:         tea.StringValue(body.InstanceId),
 		InstanceName:       tea.StringValue(body.InstanceName),
 		Description:        tea.StringValue(body.Description),
@@ -162,7 +129,7 @@ func (p *ECSProvider) RebootInstance(instanceId string, forceStop bool) error {
 }
 
 // DescribeInstances queries ECS instances with pagination.
-func (p *ECSProvider) DescribeInstances(pageNumber, pageSize int32) ([]ECSInstance, int32, error) {
+func (p *ECSProvider) DescribeInstances(pageNumber, pageSize int32) ([]provider.ECSInstance, int32, error) {
 	region := tea.StringValue(p.client.RegionId)
 	request := &ecs.DescribeInstancesRequest{
 		RegionId:   tea.String(region),
@@ -182,7 +149,7 @@ func (p *ECSProvider) DescribeInstances(pageNumber, pageSize int32) ([]ECSInstan
 
 	total := tea.Int32Value(body.TotalCount)
 
-	instances := make([]ECSInstance, 0)
+	instances := make([]provider.ECSInstance, 0)
 	if body.Instances != nil && body.Instances.Instance != nil {
 		for _, inst := range body.Instances.Instance {
 			publicIp := ""
@@ -194,7 +161,7 @@ func (p *ECSProvider) DescribeInstances(pageNumber, pageSize int32) ([]ECSInstan
 				privateIp = tea.StringValue(inst.VpcAttributes.PrivateIpAddress.IpAddress[0])
 			}
 
-			instances = append(instances, ECSInstance{
+			instances = append(instances, provider.ECSInstance{
 				InstanceId:   tea.StringValue(inst.InstanceId),
 				InstanceName: tea.StringValue(inst.InstanceName),
 				Status:       tea.StringValue(inst.Status),

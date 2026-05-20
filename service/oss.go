@@ -1,17 +1,33 @@
 package service
 
 import (
+	"cloud-manage/provider"
 	"cloud-manage/provider/aliyun"
 	"cloud-manage/security"
 	"fmt"
+	"strings"
 )
 
-// OSSService handles OSS business logic.
-type OSSService struct{}
+// OSSProviderFactory creates an OSSProvider given credentials and region.
+type OSSProviderFactory func(accessKeyId, accessKeySecret, region string) (provider.OSSProvider, error)
 
-// NewOSSService creates a new OSSService.
+// OSSService handles OSS business logic.
+type OSSService struct {
+	providerFactory OSSProviderFactory
+}
+
+// NewOSSService creates a new OSSService with default provider factory.
 func NewOSSService() *OSSService {
-	return &OSSService{}
+	return &OSSService{
+		providerFactory: func(accessKeyId, accessKeySecret, region string) (provider.OSSProvider, error) {
+			return aliyun.NewOSSProvider(accessKeyId, accessKeySecret, region)
+		},
+	}
+}
+
+// NewOSSServiceWithProvider creates a new OSSService with custom provider factory (for testing).
+func NewOSSServiceWithProvider(factory OSSProviderFactory) *OSSService {
+	return &OSSService{providerFactory: factory}
 }
 
 // BucketAdapter is a provider-agnostic representation of an OSS bucket.
@@ -52,12 +68,12 @@ func (s *OSSService) ListBuckets(accessKeyId, accessKeySecret, region string) (*
 		return nil, fmt.Errorf("accessKeyId, accessKeySecret and region are required")
 	}
 
-	provider, err := aliyun.NewOSSProvider(accessKeyId, accessKeySecret, region)
+	p, err := s.providerFactory(accessKeyId, accessKeySecret, region)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize OSS provider: %s", security.SanitizeErrorMessage(err))
 	}
 
-	buckets, err := provider.ListBuckets()
+	buckets, err := p.ListBuckets()
 	if err != nil {
 		return nil, fmt.Errorf("failed to list buckets: %s", security.SanitizeErrorMessage(err))
 	}
@@ -86,19 +102,18 @@ func (s *OSSService) ListObjects(accessKeyId, accessKeySecret, region, bucket, p
 	// Auto-detect bucket region if not specified or to handle cross-region access
 	actualRegion := region
 	if region == "" || region == "cn-hangzhou" {
-		// Try to find the bucket's actual location
-		detectedRegion, err := s.detectBucketRegion(accessKeyId, accessKeySecret, bucket)
+		detectedRegion, err := s.DetectBucketRegion(accessKeyId, accessKeySecret, bucket)
 		if err == nil && detectedRegion != "" {
 			actualRegion = detectedRegion
 		}
 	}
 
-	provider, err := aliyun.NewOSSProvider(accessKeyId, accessKeySecret, actualRegion)
+	p, err := s.providerFactory(accessKeyId, accessKeySecret, actualRegion)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize OSS provider: %s", security.SanitizeErrorMessage(err))
 	}
 
-	objects, isTruncated, err := provider.ListObjects(bucket, prefix, maxKeys)
+	objects, isTruncated, err := p.ListObjects(bucket, prefix, maxKeys)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list objects: %s", security.SanitizeErrorMessage(err))
 	}
@@ -121,24 +136,22 @@ func (s *OSSService) ListObjects(accessKeyId, accessKeySecret, region, bucket, p
 	}, nil
 }
 
-// detectBucketRegion finds the actual region of a bucket by listing all buckets.
-func (s *OSSService) detectBucketRegion(accessKeyId, accessKeySecret, bucket string) (string, error) {
-	// Use cn-hangzhou as default to list all buckets (ListBuckets is a global operation)
-	provider, err := aliyun.NewOSSProvider(accessKeyId, accessKeySecret, "cn-hangzhou")
+// DetectBucketRegion finds the actual region of a bucket by listing all buckets.
+func (s *OSSService) DetectBucketRegion(accessKeyId, accessKeySecret, bucket string) (string, error) {
+	p, err := s.providerFactory(accessKeyId, accessKeySecret, "cn-hangzhou")
 	if err != nil {
 		return "", err
 	}
 
-	buckets, err := provider.ListBuckets()
+	buckets, err := p.ListBuckets()
 	if err != nil {
 		return "", err
 	}
 
 	for _, b := range buckets {
 		if b.Name == bucket {
-			// Location format is "oss-cn-shenzhen", convert to "cn-shenzhen"
 			location := b.Location
-			if len(location) > 4 && location[:4] == "oss-" {
+			if strings.HasPrefix(location, "oss-") {
 				return location[4:], nil
 			}
 			return location, nil

@@ -1,6 +1,7 @@
 package aliyun
 
 import (
+	"cloud-manage/provider"
 	"fmt"
 
 	oss "github.com/alibabacloud-go/oss-20190517/client"
@@ -30,28 +31,8 @@ func NewOSSProvider(accessKeyId, accessKeySecret, region string) (*OSSProvider, 
 	return &OSSProvider{client: client, region: region}, nil
 }
 
-// OSSBucket represents an OSS bucket.
-type OSSBucket struct {
-	Name             string `json:"name"`
-	Location         string `json:"location"`
-	CreationDate     string `json:"creationDate"`
-	StorageClass     string `json:"storageClass"`
-	ExtranetEndpoint string `json:"extranetEndpoint"`
-	IntranetEndpoint string `json:"intranetEndpoint"`
-}
-
-// OSSObject represents an OSS object.
-type OSSObject struct {
-	Key          string `json:"key"`
-	Size         int64  `json:"size"`
-	LastModified string `json:"lastModified"`
-	ETag         string `json:"etag"`
-	Type         string `json:"type"`
-	StorageClass string `json:"storageClass"`
-}
-
 // ListBuckets lists all OSS buckets.
-func (p *OSSProvider) ListBuckets() ([]OSSBucket, error) {
+func (p *OSSProvider) ListBuckets() ([]provider.OSSBucket, error) {
 	request := &oss.ListBucketsRequest{
 		MaxKeys: tea.Int64(100),
 	}
@@ -63,13 +44,13 @@ func (p *OSSProvider) ListBuckets() ([]OSSBucket, error) {
 
 	body := response.Body
 	if body == nil {
-		return []OSSBucket{}, nil
+		return []provider.OSSBucket{}, nil
 	}
 
-	buckets := make([]OSSBucket, 0)
+	buckets := make([]provider.OSSBucket, 0)
 	if body.Buckets != nil && body.Buckets.Buckets != nil {
 		for _, b := range body.Buckets.Buckets {
-			bucket := OSSBucket{
+			bucket := provider.OSSBucket{
 				Name:         tea.StringValue(b.Name),
 				Location:     tea.StringValue(b.Location),
 				CreationDate: tea.StringValue(b.CreationDate),
@@ -89,8 +70,7 @@ func (p *OSSProvider) ListBuckets() ([]OSSBucket, error) {
 }
 
 // ListObjects lists objects in an OSS bucket.
-func (p *OSSProvider) ListObjects(bucket, prefix string, maxKeys int32) ([]OSSObject, bool, error) {
-	// Limit maxKeys to prevent excessive memory usage
+func (p *OSSProvider) ListObjects(bucket, prefix string, maxKeys int32) ([]provider.OSSObject, bool, error) {
 	if maxKeys > 1000 {
 		maxKeys = 1000
 	}
@@ -111,13 +91,13 @@ func (p *OSSProvider) ListObjects(bucket, prefix string, maxKeys int32) ([]OSSOb
 
 	body := response.Body
 	if body == nil {
-		return []OSSObject{}, false, nil
+		return []provider.OSSObject{}, false, nil
 	}
 
-	objects := make([]OSSObject, 0)
+	objects := make([]provider.OSSObject, 0)
 	if body.Contents != nil {
 		for _, obj := range body.Contents {
-			object := OSSObject{
+			object := provider.OSSObject{
 				Key:          tea.StringValue(obj.Key),
 				Size:         tea.Int64Value(obj.Size),
 				LastModified: tea.StringValue(obj.LastModified),
