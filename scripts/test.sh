@@ -1,6 +1,5 @@
 #!/bin/bash
-# Run all Go tests for the Cloud 管理小助手 project.
-# Usage: ./scripts/test.sh
+# scripts/test.sh - Run tests with coverage
 
 set -e
 
@@ -9,10 +8,17 @@ PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 
 cd "$PROJECT_DIR"
 
-echo "==> Running Go tests..."
-echo ""
-
-GO111MODULE=on go test ./... -v
+echo "Running unit tests..."
+go test ./... -v -coverprofile=coverage.out -covermode=atomic
 
 echo ""
-echo "==> All tests passed."
+echo "Coverage report:"
+go tool cover -func=coverage.out
+
+echo ""
+echo "Generating HTML coverage report..."
+go tool cover -html=coverage.out -o coverage.html
+
+echo ""
+echo "Total coverage:"
+go tool cover -func=coverage.out | tail -1
