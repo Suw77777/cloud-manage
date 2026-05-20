@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cloud-manage/internal/tui"
 	"cloud-manage/service"
 	"embed"
 	"encoding/json"
@@ -10,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
@@ -27,6 +29,7 @@ var (
 	outputJSON      bool
 	forceGUI        bool
 	forceCLI        bool
+	forceTUI        bool
 )
 
 func init() {
@@ -36,6 +39,7 @@ func init() {
 	flag.BoolVar(&outputJSON, "json", false, "Output in JSON format")
 	flag.BoolVar(&forceGUI, "gui", false, "Force GUI mode (requires display)")
 	flag.BoolVar(&forceCLI, "cli", false, "Force CLI mode")
+	flag.BoolVar(&forceTUI, "tui", false, "Force TUI mode (terminal UI)")
 }
 
 // knownServices are the valid CLI subcommands.
@@ -59,16 +63,21 @@ func main() {
 	switch mode {
 	case "gui":
 		runGUI()
+	case "tui":
+		runTUI()
 	case "cli":
 		runCLI()
 	}
 }
 
-// detectMode determines whether to run in GUI or CLI mode.
+// detectMode determines whether to run in GUI, TUI, or CLI mode.
 func detectMode() string {
 	// 1. Explicit flags take priority
 	if forceGUI {
 		return "gui"
+	}
+	if forceTUI {
+		return "tui"
 	}
 	if forceCLI {
 		return "cli"
@@ -85,11 +94,8 @@ func detectMode() string {
 		return "gui"
 	}
 
-	// 4. No display found, default to CLI with hint
-	fmt.Println("  未检测到图形环境，进入 CLI 模式。")
-	fmt.Println("  使用 --gui 标志强制启动 GUI（需要图形环境）。")
-	fmt.Println()
-	return "cli"
+	// 4. No display found, default to TUI
+	return "tui"
 }
 
 // runGUI starts the Wails desktop application.
@@ -112,6 +118,15 @@ func runGUI() {
 		},
 	})
 	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+}
+
+// runTUI starts the terminal UI application.
+func runTUI() {
+	p := tea.NewProgram(tui.NewApp(), tea.WithAltScreen())
+	if _, err := p.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
@@ -177,6 +192,7 @@ func printUsage() {
 
 Modes:
   --gui             Force GUI mode (requires display)
+  --tui             Force TUI mode (terminal UI)
   --cli             Force CLI mode
   (auto)            Auto-detect based on display environment
 
@@ -194,8 +210,11 @@ Flags:`)
 	flag.PrintDefaults()
 	fmt.Println(`
 Examples:
-  # Auto-detect mode (GUI if display available, CLI otherwise)
+  # Auto-detect mode (TUI if no display, GUI if display available)
   cloud-manage
+
+  # Force TUI mode
+  cloud-manage --tui
 
   # Force GUI mode
   cloud-manage --gui
