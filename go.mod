@@ -1,6 +1,6 @@
 module cloud-manage
 
-go 1.24.5
+go 1.21
 
 require (
 	github.com/alibabacloud-go/cms-20190101/v8 v8.0.11
