@@ -1,8 +1,6 @@
 package views
 
 import (
-	"fmt"
-
 	tea "github.com/charmbracelet/bubbletea"
 	"cloud-manage/internal/tui/components"
 	"cloud-manage/service"
