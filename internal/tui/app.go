@@ -16,9 +16,11 @@ const (
 	TabCMS
 	TabSLS
 	TabOSS
+	TabVPC
+	TabSLB
 )
 
-var tabNames = []string{"ECS", "CMS", "SLS", "OSS"}
+var tabNames = []string{"ECS", "CMS", "SLS", "OSS", "VPC", "SLB"}
 
 type App struct {
 	activeTab    Tab
@@ -118,7 +120,7 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				a.activeTab--
 			}
 		case key.Matches(msg, Keys.Right):
-			if a.activeTab < TabOSS {
+			if a.activeTab < TabSLB {
 				a.activeTab++
 			}
 		}
