@@ -97,3 +97,88 @@ type OSSObject struct {
 	Type         string `json:"type"`
 	StorageClass string `json:"storageClass"`
 }
+
+// VPCProvider defines the interface for VPC operations.
+type VPCProvider interface {
+	ListVPCs() ([]VPC, error)
+	GetVPCDetail(vpcId string) (*VPCDetail, error)
+	ListVSwitches(vpcId string) ([]VSwitch, error)
+}
+
+// VPC represents a VPC network.
+type VPC struct {
+	VpcId        string `json:"vpcId"`
+	VpcName      string `json:"vpcName"`
+	CidrBlock    string `json:"cidrBlock"`
+	Status       string `json:"status"`
+	RegionId     string `json:"regionId"`
+	Description  string `json:"description"`
+	CreationTime string `json:"creationTime"`
+}
+
+// VPCDetail holds detailed information about a VPC.
+type VPCDetail struct {
+	VpcId          string   `json:"vpcId"`
+	VpcName        string   `json:"vpcName"`
+	CidrBlock      string   `json:"cidrBlock"`
+	Status         string   `json:"status"`
+	RegionId       string   `json:"regionId"`
+	Description    string   `json:"description"`
+	CreationTime   string   `json:"creationTime"`
+	VSwitchIds     []string `json:"vswitchIds"`
+	NatGatewayIds  []string `json:"natGatewayIds"`
+	RouterTableIds []string `json:"routerTableIds"`
+}
+
+// VSwitch represents a virtual switch in a VPC.
+type VSwitch struct {
+	VSwitchId    string `json:"vswitchId"`
+	VSwitchName  string `json:"vswitchName"`
+	CidrBlock    string `json:"cidrBlock"`
+	ZoneId       string `json:"zoneId"`
+	Status       string `json:"status"`
+	VpcId        string `json:"vpcId"`
+	CreationTime string `json:"creationTime"`
+}
+
+// SLBProvider defines the interface for SLB operations.
+type SLBProvider interface {
+	ListSLBs() ([]SLB, error)
+	GetSLBDetail(slbId string) (*SLBDetail, error)
+	ListSLBListeners(slbId string) ([]SLBListener, error)
+}
+
+// SLB represents a Server Load Balancer instance.
+type SLB struct {
+	LoadBalancerId   string `json:"loadBalancerId"`
+	LoadBalancerName string `json:"loadBalancerName"`
+	Address          string `json:"address"`
+	AddressType      string `json:"addressType"`
+	Status           string `json:"status"`
+	RegionId         string `json:"regionId"`
+	VpcId            string `json:"vpcId"`
+	CreationTime     string `json:"creationTime"`
+}
+
+// SLBDetail holds detailed information about an SLB instance.
+type SLBDetail struct {
+	LoadBalancerId   string `json:"loadBalancerId"`
+	LoadBalancerName string `json:"loadBalancerName"`
+	Address          string `json:"address"`
+	AddressType      string `json:"addressType"`
+	Status           string `json:"status"`
+	RegionId         string `json:"regionId"`
+	VpcId            string `json:"vpcId"`
+	VSwitchId        string `json:"vswitchId"`
+	CreationTime     string `json:"creationTime"`
+	ListenerCount    int    `json:"listenerCount"`
+	Bandwidth        int    `json:"bandwidth"`
+}
+
+// SLBListener represents a listener on an SLB instance.
+type SLBListener struct {
+	ListenerPort     int    `json:"listenerPort"`
+	ListenerProtocol string `json:"listenerProtocol"`
+	Status           string `json:"status"`
+	Bandwidth        int    `json:"bandwidth"`
+}
