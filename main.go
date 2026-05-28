@@ -48,6 +48,8 @@ var knownServices = map[string]bool{
 	"cms":     true,
 	"sls":     true,
 	"oss":     true,
+	"vpc":     true,
+	"slb":     true,
 	"help":    true,
 	"version": true,
 }
@@ -180,6 +182,10 @@ func runCLI() {
 		handleSLS(action, remainingArgs)
 	case "oss":
 		handleOSS(action, remainingArgs)
+	case "vpc":
+		handleVPC(action, remainingArgs)
+	case "slb":
+		handleSLB(action, remainingArgs)
 	default:
 		fmt.Fprintf(os.Stderr, "Unknown service: %s\n", serviceName)
 		printUsage()
@@ -202,6 +208,8 @@ Services:
   cms               云监控指标查询
   sls               日志服务查询
   oss               对象存储管理
+  vpc               VPC 网络管理
+  slb               负载均衡管理
 
 Commands:
   help              显示帮助信息
@@ -240,6 +248,15 @@ Examples:
 
   # CLI: Query SLS logs
   cloud-manage sls logs my-project my-logstore --query "level: ERROR"
+
+  # CLI: List VPCs
+  cloud-manage vpc list
+
+  # CLI: List VSwitches in a VPC
+  cloud-manage vpc vswitches vpc-xxx
+
+  # CLI: List SLBs
+  cloud-manage slb list
 
 Environment Variables:
   CLOUD_ACCESS_KEY_ID      AccessKey ID
@@ -549,6 +566,122 @@ func handleOSS(action string, args []string) {
 
 // ========== Output Formatting ==========
 
+func handleVPC(action string, args []string) {
+	svc := service.NewVPCService()
+
+	switch action {
+	case "list":
+		result, err := svc.ListVPCs(accessKeyId, accessKeySecret, region)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+		if outputJSON {
+			printJSON(result)
+		} else {
+			printVPCs(result.VPCs)
+		}
+
+	case "detail":
+		if len(args) < 1 {
+			fmt.Fprintf(os.Stderr, "Usage: cloud-manage vpc detail <vpc-id>\n")
+			os.Exit(1)
+		}
+		vpcId := args[0]
+		result, err := svc.GetVPCDetail(accessKeyId, accessKeySecret, region, vpcId)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+		if outputJSON {
+			printJSON(result)
+		} else {
+			printVPCDetail(result)
+		}
+
+	case "vswitches":
+		if len(args) < 1 {
+			fmt.Fprintf(os.Stderr, "Usage: cloud-manage vpc vswitches <vpc-id>\n")
+			os.Exit(1)
+		}
+		vpcId := args[0]
+		result, err := svc.ListVSwitches(accessKeyId, accessKeySecret, region, vpcId)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+		if outputJSON {
+			printJSON(result)
+		} else {
+			printVSwitches(result.VSwitches)
+		}
+
+	default:
+		fmt.Println(`VPC Actions:
+  list                        列出 VPC
+  detail <vpc-id>             查看 VPC 详情
+  vswitches <vpc-id>          列出虚拟交换机`)
+	}
+}
+
+func handleSLB(action string, args []string) {
+	svc := service.NewSLBService()
+
+	switch action {
+	case "list":
+		result, err := svc.ListSLBs(accessKeyId, accessKeySecret, region)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+		if outputJSON {
+			printJSON(result)
+		} else {
+			printSLBs(result.SLBs)
+		}
+
+	case "detail":
+		if len(args) < 1 {
+			fmt.Fprintf(os.Stderr, "Usage: cloud-manage slb detail <slb-id>\n")
+			os.Exit(1)
+		}
+		slbId := args[0]
+		result, err := svc.GetSLBDetail(accessKeyId, accessKeySecret, region, slbId)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+		if outputJSON {
+			printJSON(result)
+		} else {
+			printSLBDetail(result)
+		}
+
+	case "listeners":
+		if len(args) < 1 {
+			fmt.Fprintf(os.Stderr, "Usage: cloud-manage slb listeners <slb-id>\n")
+			os.Exit(1)
+		}
+		slbId := args[0]
+		result, err := svc.ListSLBListeners(accessKeyId, accessKeySecret, region, slbId)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+		if outputJSON {
+			printJSON(result)
+		} else {
+			printSLBListeners(result.Listeners)
+		}
+
+	default:
+		fmt.Println(`SLB Actions:
+  list                          列出 SLB 实例
+  detail <slb-id>               查看 SLB 详情
+  listeners <slb-id>            列出监听器`)
+	}
+}
+
 func printJSON(v interface{}) {
 	data, err := json.MarshalIndent(v, "", "  ")
 	if err != nil {
@@ -683,6 +816,87 @@ func formatSize(bytes int64) string {
 		exp++
 	}
 	return fmt.Sprintf("%.1f %cB", float64(bytes)/float64(div), "KMGTPE"[exp])
+}
+
+func printVPCs(vpcs []service.VPCAdapter) {
+	if len(vpcs) == 0 {
+		fmt.Println("No VPCs found")
+		return
+	}
+	fmt.Printf("\nVPCs:\n")
+	for _, v := range vpcs {
+		fmt.Printf("  %-20s %-20s %-18s %s\n", v.VpcId, v.VpcName, v.CidrBlock, v.Status)
+	}
+}
+
+func printVPCDetail(d *service.VPCDetailAdapter) {
+	fmt.Printf(`
+VPC Detail:
+  ID:               %s
+  Name:             %s
+  CIDR:             %s
+  Status:           %s
+  Region:           %s
+  Description:      %s
+  Created:          %s
+  VSwitch IDs:      %s
+`,
+		d.VpcId, d.VpcName, d.CidrBlock, d.Status, d.RegionId,
+		d.Description, d.CreationTime, strings.Join(d.VSwitchIds, ", "))
+}
+
+func printVSwitches(vswitches []service.VSwitchAdapter) {
+	if len(vswitches) == 0 {
+		fmt.Println("No VSwitches found")
+		return
+	}
+	fmt.Printf("\nVSwitches:\n")
+	for _, vs := range vswitches {
+		fmt.Printf("  %-20s %-20s %-18s %s\n", vs.VSwitchId, vs.VSwitchName, vs.CidrBlock, vs.ZoneId)
+	}
+}
+
+func printSLBs(slbs []service.SLBAdapter) {
+	if len(slbs) == 0 {
+		fmt.Println("No SLBs found")
+		return
+	}
+	fmt.Printf("\nSLBs:\n")
+	for _, lb := range slbs {
+		fmt.Printf("  %-20s %-20s %-15s %-10s %s\n", lb.LoadBalancerId, lb.LoadBalancerName, lb.Address, lb.AddressType, lb.Status)
+	}
+}
+
+func printSLBDetail(d *service.SLBDetailAdapter) {
+	fmt.Printf(`
+SLB Detail:
+  ID:               %s
+  Name:             %s
+  Address:          %s
+  Address Type:     %s
+  Status:           %s
+  Region:           %s
+  VPC ID:           %s
+  VSwitch ID:       %s
+  Created:          %s
+  Listeners:        %d
+  Bandwidth:        %d Mbps
+`,
+		d.LoadBalancerId, d.LoadBalancerName, d.Address, d.AddressType,
+		d.Status, d.RegionId, d.VpcId, d.VSwitchId,
+		d.CreationTime, d.ListenerCount, d.Bandwidth)
+}
+
+func printSLBListeners(listeners []service.SLBListenerAdapter) {
+	if len(listeners) == 0 {
+		fmt.Println("No listeners found")
+		return
+	}
+	fmt.Printf("\nSLB Listeners:\n")
+	for _, l := range listeners {
+		fmt.Printf("  Port: %-6d Protocol: %-8s Status: %-10s Bandwidth: %d Mbps\n",
+			l.ListenerPort, l.ListenerProtocol, l.Status, l.Bandwidth)
+	}
 }
 
 func getAllRegions() []string {
