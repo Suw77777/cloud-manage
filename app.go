@@ -21,6 +21,8 @@ type App struct {
 	cmsSvc  *service.CMSService
 	slsSvc  *service.SLSService
 	ossSvc  *service.OSSService
+	vpcSvc  *service.VPCService
+	slbSvc  *service.SLBService
 }
 
 // NewApp creates a new App instance.
@@ -30,6 +32,8 @@ func NewApp() *App {
 		cmsSvc: service.NewCMSService(),
 		slsSvc: service.NewSLSService(),
 		ossSvc: service.NewOSSService(),
+		vpcSvc: service.NewVPCService(),
+		slbSvc: service.NewSLBService(),
 	}
 }
 
@@ -660,5 +664,293 @@ func (a *App) ListOSSObjects(accessKeyId, accessKeySecret, region, bucket, prefi
 		Message:     fmt.Sprintf("found %d object(s)", len(objects)),
 		Objects:     objects,
 		IsTruncated: result.IsTruncated,
+	}
+}
+
+// VPCView 是前端友好的 VPC 表示。
+type VPCView struct {
+	VpcId        string `json:"vpcId"`
+	VpcName      string `json:"vpcName"`
+	CidrBlock    string `json:"cidrBlock"`
+	Status       string `json:"status"`
+	RegionId     string `json:"regionId"`
+	Description  string `json:"description"`
+	CreationTime string `json:"creationTime"`
+}
+
+// VPCDetailResult 是 VPC 详情查询的响应类型。
+type VPCDetailResult struct {
+	Success bool           `json:"success"`
+	Message string         `json:"message"`
+	Detail  *VPCDetailView `json:"detail,omitempty"`
+}
+
+// VPCDetailView 是前端友好的 VPC 详情表示。
+type VPCDetailView struct {
+	VpcId          string   `json:"vpcId"`
+	VpcName        string   `json:"vpcName"`
+	CidrBlock      string   `json:"cidrBlock"`
+	Status         string   `json:"status"`
+	RegionId       string   `json:"regionId"`
+	Description    string   `json:"description"`
+	CreationTime   string   `json:"creationTime"`
+	VSwitchIds     []string `json:"vswitchIds"`
+	NatGatewayIds  []string `json:"natGatewayIds"`
+	RouterTableIds []string `json:"routerTableIds"`
+}
+
+// VSwitchView 是前端友好的 VSwitch 表示。
+type VSwitchView struct {
+	VSwitchId    string `json:"vswitchId"`
+	VSwitchName  string `json:"vswitchName"`
+	CidrBlock    string `json:"cidrBlock"`
+	ZoneId       string `json:"zoneId"`
+	Status       string `json:"status"`
+	VpcId        string `json:"vpcId"`
+	CreationTime string `json:"creationTime"`
+}
+
+// VPCListResult 是 VPC 列表查询的响应类型。
+type VPCListResult struct {
+	Success bool      `json:"success"`
+	Message string    `json:"message"`
+	VPCs    []VPCView `json:"vpcs"`
+}
+
+// VSwitchListResult 是 VSwitch 列表查询的响应类型。
+type VSwitchListResult struct {
+	Success   bool          `json:"success"`
+	Message   string        `json:"message"`
+	VSwitches []VSwitchView `json:"vswitches"`
+}
+
+// ListVPCs 列出区域内的所有 VPC。
+func (a *App) ListVPCs(accessKeyId, accessKeySecret, region string) VPCListResult {
+	result, err := a.vpcSvc.ListVPCs(accessKeyId, accessKeySecret, region)
+	if err != nil {
+		return VPCListResult{
+			Success: false,
+			Message: security.SanitizeErrorMessage(err),
+		}
+	}
+
+	vpcs := make([]VPCView, 0, len(result.VPCs))
+	for _, v := range result.VPCs {
+		vpcs = append(vpcs, VPCView{
+			VpcId:        v.VpcId,
+			VpcName:      v.VpcName,
+			CidrBlock:    v.CidrBlock,
+			Status:       v.Status,
+			RegionId:     v.RegionId,
+			Description:  v.Description,
+			CreationTime: v.CreationTime,
+		})
+	}
+
+	return VPCListResult{
+		Success: true,
+		Message: fmt.Sprintf("found %d VPC(s)", len(vpcs)),
+		VPCs:    vpcs,
+	}
+}
+
+// GetVPCDetail 查询单个 VPC 的详细信息。
+func (a *App) GetVPCDetail(accessKeyId, accessKeySecret, region, vpcId string) VPCDetailResult {
+	detail, err := a.vpcSvc.GetVPCDetail(accessKeyId, accessKeySecret, region, vpcId)
+	if err != nil {
+		return VPCDetailResult{
+			Success: false,
+			Message: security.SanitizeErrorMessage(err),
+		}
+	}
+
+	return VPCDetailResult{
+		Success: true,
+		Message: "VPC detail retrieved successfully",
+		Detail: &VPCDetailView{
+			VpcId:          detail.VpcId,
+			VpcName:        detail.VpcName,
+			CidrBlock:      detail.CidrBlock,
+			Status:         detail.Status,
+			RegionId:       detail.RegionId,
+			Description:    detail.Description,
+			CreationTime:   detail.CreationTime,
+			VSwitchIds:     detail.VSwitchIds,
+			NatGatewayIds:  detail.NatGatewayIds,
+			RouterTableIds: detail.RouterTableIds,
+		},
+	}
+}
+
+// ListVSwitches 列出 VPC 中的所有虚拟交换机。
+func (a *App) ListVSwitches(accessKeyId, accessKeySecret, region, vpcId string) VSwitchListResult {
+	result, err := a.vpcSvc.ListVSwitches(accessKeyId, accessKeySecret, region, vpcId)
+	if err != nil {
+		return VSwitchListResult{
+			Success: false,
+			Message: security.SanitizeErrorMessage(err),
+		}
+	}
+
+	vswitches := make([]VSwitchView, 0, len(result.VSwitches))
+	for _, vs := range result.VSwitches {
+		vswitches = append(vswitches, VSwitchView{
+			VSwitchId:    vs.VSwitchId,
+			VSwitchName:  vs.VSwitchName,
+			CidrBlock:    vs.CidrBlock,
+			ZoneId:       vs.ZoneId,
+			Status:       vs.Status,
+			VpcId:        vs.VpcId,
+			CreationTime: vs.CreationTime,
+		})
+	}
+
+	return VSwitchListResult{
+		Success:   true,
+		Message:   fmt.Sprintf("found %d VSwitch(es)", len(vswitches)),
+		VSwitches: vswitches,
+	}
+}
+
+// SLBView 是前端友好的 SLB 表示。
+type SLBView struct {
+	LoadBalancerId   string `json:"loadBalancerId"`
+	LoadBalancerName string `json:"loadBalancerName"`
+	Address          string `json:"address"`
+	AddressType      string `json:"addressType"`
+	Status           string `json:"status"`
+	RegionId         string `json:"regionId"`
+	VpcId            string `json:"vpcId"`
+	CreationTime     string `json:"creationTime"`
+}
+
+// SLBDetailResult 是 SLB 详情查询的响应类型。
+type SLBDetailResult struct {
+	Success bool           `json:"success"`
+	Message string         `json:"message"`
+	Detail  *SLBDetailView `json:"detail,omitempty"`
+}
+
+// SLBDetailView 是前端友好的 SLB 详情表示。
+type SLBDetailView struct {
+	LoadBalancerId   string `json:"loadBalancerId"`
+	LoadBalancerName string `json:"loadBalancerName"`
+	Address          string `json:"address"`
+	AddressType      string `json:"addressType"`
+	Status           string `json:"status"`
+	RegionId         string `json:"regionId"`
+	VpcId            string `json:"vpcId"`
+	VSwitchId        string `json:"vswitchId"`
+	CreationTime     string `json:"creationTime"`
+	ListenerCount    int    `json:"listenerCount"`
+	Bandwidth        int    `json:"bandwidth"`
+}
+
+// SLBListenerView 是前端友好的 SLB 监听器表示。
+type SLBListenerView struct {
+	ListenerPort     int    `json:"listenerPort"`
+	ListenerProtocol string `json:"listenerProtocol"`
+	Status           string `json:"status"`
+	Bandwidth        int    `json:"bandwidth"`
+}
+
+// SLBListResult 是 SLB 列表查询的响应类型。
+type SLBListResult struct {
+	Success bool      `json:"success"`
+	Message string    `json:"message"`
+	SLBs    []SLBView `json:"slbs"`
+}
+
+// SLBListenerListResult 是 SLB 监听器列表查询的响应类型。
+type SLBListenerListResult struct {
+	Success   bool              `json:"success"`
+	Message   string            `json:"message"`
+	Listeners []SLBListenerView `json:"listeners"`
+}
+
+// ListSLBs 列出区域内的所有 SLB 实例。
+func (a *App) ListSLBs(accessKeyId, accessKeySecret, region string) SLBListResult {
+	result, err := a.slbSvc.ListSLBs(accessKeyId, accessKeySecret, region)
+	if err != nil {
+		return SLBListResult{
+			Success: false,
+			Message: security.SanitizeErrorMessage(err),
+		}
+	}
+
+	slbs := make([]SLBView, 0, len(result.SLBs))
+	for _, lb := range result.SLBs {
+		slbs = append(slbs, SLBView{
+			LoadBalancerId:   lb.LoadBalancerId,
+			LoadBalancerName: lb.LoadBalancerName,
+			Address:          lb.Address,
+			AddressType:      lb.AddressType,
+			Status:           lb.Status,
+			RegionId:         lb.RegionId,
+			VpcId:            lb.VpcId,
+			CreationTime:     lb.CreationTime,
+		})
+	}
+
+	return SLBListResult{
+		Success: true,
+		Message: fmt.Sprintf("found %d SLB(s)", len(slbs)),
+		SLBs:    slbs,
+	}
+}
+
+// GetSLBDetail 查询单个 SLB 实例的详细信息。
+func (a *App) GetSLBDetail(accessKeyId, accessKeySecret, region, slbId string) SLBDetailResult {
+	detail, err := a.slbSvc.GetSLBDetail(accessKeyId, accessKeySecret, region, slbId)
+	if err != nil {
+		return SLBDetailResult{
+			Success: false,
+			Message: security.SanitizeErrorMessage(err),
+		}
+	}
+
+	return SLBDetailResult{
+		Success: true,
+		Message: "SLB detail retrieved successfully",
+		Detail: &SLBDetailView{
+			LoadBalancerId:   detail.LoadBalancerId,
+			LoadBalancerName: detail.LoadBalancerName,
+			Address:          detail.Address,
+			AddressType:      detail.AddressType,
+			Status:           detail.Status,
+			RegionId:         detail.RegionId,
+			VpcId:            detail.VpcId,
+			VSwitchId:        detail.VSwitchId,
+			CreationTime:     detail.CreationTime,
+			ListenerCount:    detail.ListenerCount,
+			Bandwidth:        detail.Bandwidth,
+		},
+	}
+}
+
+// ListSLBListeners 列出 SLB 实例上的所有监听器。
+func (a *App) ListSLBListeners(accessKeyId, accessKeySecret, region, slbId string) SLBListenerListResult {
+	result, err := a.slbSvc.ListSLBListeners(accessKeyId, accessKeySecret, region, slbId)
+	if err != nil {
+		return SLBListenerListResult{
+			Success: false,
+			Message: security.SanitizeErrorMessage(err),
+		}
+	}
+
+	listeners := make([]SLBListenerView, 0, len(result.Listeners))
+	for _, l := range result.Listeners {
+		listeners = append(listeners, SLBListenerView{
+			ListenerPort:     l.ListenerPort,
+			ListenerProtocol: l.ListenerProtocol,
+			Status:           l.Status,
+			Bandwidth:        l.Bandwidth,
+		})
+	}
+
+	return SLBListenerListResult{
+		Success:   true,
+		Message:   fmt.Sprintf("found %d listener(s)", len(listeners)),
+		Listeners: listeners,
 	}
 }
