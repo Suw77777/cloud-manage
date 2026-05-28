@@ -1,6 +1,6 @@
 # Cloud Manage
 
-阿里云资源管理工具，支持 GUI 和 CLI 两种模式，覆盖 ECS、CMS、SLS、OSS 服务。
+阿里云资源管理工具，支持 GUI、TUI 和 CLI 三种模式，覆盖 ECS、CMS、SLS、OSS、VPC、SLB 服务。
 
 ## 构建
 
@@ -49,6 +49,18 @@ go build -o cloud-manage ./cmd/cli/
 ./build/bin/cloud-manage
 ```
 
+### TUI 模式（终端界面）
+
+```bash
+# 强制 TUI 模式
+./cloud-manage --tui
+
+# 功能
+# - 登录界面输入凭证
+# - Tab 切换：ECS、CMS、SLS、OSS、VPC、SLB
+# - 方向键导航，Enter 查看详情
+```
+
 ### CLI 模式（推荐用于服务器/无 GUI 环境）
 
 ```bash
@@ -74,6 +86,16 @@ export CLOUD_ACCESS_KEY_SECRET=your-key-secret
 # 对象存储
 ./cloud-manage oss buckets
 ./cloud-manage oss objects <bucket> --prefix logs/ --max 100
+
+# VPC 网络
+./cloud-manage vpc list
+./cloud-manage vpc detail <vpc-id>
+./cloud-manage vpc vswitches <vpc-id>
+
+# 负载均衡
+./cloud-manage slb list
+./cloud-manage slb detail <slb-id>
+./cloud-manage slb listeners <slb-id>
 ```
 
 ### AppImage 模式
@@ -92,14 +114,16 @@ export CLOUD_ACCESS_KEY_SECRET=your-key-secret
 | `-region` | 地域 | `cn-hangzhou` |
 | `-json` | JSON 输出 | `false` |
 
-## 支持的云产品（CMS）
+## 支持的服务
 
-| 产品 ID | 产品名称 |
-|---------|----------|
-| ecs | 云服务器 ECS |
-| rds | 云数据库 RDS |
-| slb | 负载均衡 SLB |
-| redis | 云数据库 Redis |
+| 服务 | 功能 |
+|------|------|
+| ECS | 云服务器实例管理（列表、详情、启动、停止、重启） |
+| CMS | 云监控指标查询（CPU、内存、磁盘、网络） |
+| SLS | 日志服务查询（Logstore 列表、日志查询） |
+| OSS | 对象存储管理（Bucket 列表、对象列表） |
+| VPC | VPC 网络管理（VPC 列表、详情、VSwitch 列表） |
+| SLB | 负载均衡管理（SLB 列表、详情、监听器列表） |
 
 ## Docker 构建
 
