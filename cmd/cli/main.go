@@ -52,13 +52,13 @@ func main() {
 		action = args[1]
 	}
 
-	// Validate credentials (not needed for help/version)
-	if serviceName != "help" && serviceName != "version" {
-		if action != "" && (accessKeyId == "" || accessKeySecret == "") {
-			fmt.Fprintf(os.Stderr, "Error: AccessKey ID and Secret are required.\n")
-			fmt.Fprintf(os.Stderr, "Use -id/-secret flags or set CLOUD_ACCESS_KEY_ID/CLOUD_ACCESS_KEY_SECRET environment variables.\n")
-			os.Exit(1)
-		}
+	// Validate credentials (not needed for help/version/product listing)
+	needsCredentials := serviceName != "help" && serviceName != "version"
+	needsCredentials = needsCredentials && !(serviceName == "cms" && action == "products")
+	if needsCredentials && action != "" && (accessKeyId == "" || accessKeySecret == "") {
+		fmt.Fprintf(os.Stderr, "Error: AccessKey ID and Secret are required.\n")
+		fmt.Fprintf(os.Stderr, "Use -id/-secret flags or set CLOUD_ACCESS_KEY_ID/CLOUD_ACCESS_KEY_SECRET environment variables.\n")
+		os.Exit(1)
 	}
 
 	remainingArgs := []string{}

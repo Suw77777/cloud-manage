@@ -154,8 +154,9 @@ func runCLI() {
 		action = args[1]
 	}
 
-	// Validate credentials (not needed for help display)
-	if action != "" && (accessKeyId == "" || accessKeySecret == "") {
+	// Validate credentials (not needed for help display or product listing)
+	needsCredentials := action != "" && !(serviceName == "cms" && action == "products")
+	if needsCredentials && (accessKeyId == "" || accessKeySecret == "") {
 		fmt.Fprintf(os.Stderr, "Error: AccessKey ID and Secret are required.\n")
 		fmt.Fprintf(os.Stderr, "Use -id/-secret flags or set CLOUD_ACCESS_KEY_ID/CLOUD_ACCESS_KEY_SECRET environment variables.\n")
 		os.Exit(1)
@@ -366,6 +367,14 @@ func handleCMS(action string, args []string) {
 	svc := service.NewCMSService()
 
 	switch action {
+	case "products":
+		products := svc.GetSupportedProducts()
+		if outputJSON {
+			printJSON(products)
+		} else {
+			printProducts(products)
+		}
+
 	case "metrics":
 		if len(args) < 1 {
 			fmt.Fprintf(os.Stderr, "Usage: cloud-manage cms metrics <instance-id>\n")
@@ -385,6 +394,7 @@ func handleCMS(action string, args []string) {
 
 	default:
 		fmt.Println(`CMS Actions:
+  products          列出支持的云产品
   metrics <id>      查询实例监控指标`)
 	}
 }
@@ -615,6 +625,17 @@ func printMetrics(m service.ECSMetricAdapter) {
 		fmt.Printf("  Internet TX:         %.2f bps\n", *m.InternetTX)
 	}
 	fmt.Printf("  Update Time:         %s\n", m.UpdateTime)
+}
+
+func printProducts(products []service.CloudProduct) {
+	fmt.Printf("\n支持的云产品:\n")
+	for _, p := range products {
+		fmt.Printf("\n  [%s] %s (namespace: %s)\n", p.ID, p.Name, p.Namespace)
+		fmt.Println("  监控指标:")
+		for _, m := range p.Metrics {
+			fmt.Printf("    - %-30s %s (%s)\n", m.Name, m.Unit, m.Description)
+		}
+	}
 }
 
 func printLogs(result *service.LogQueryResult) {
