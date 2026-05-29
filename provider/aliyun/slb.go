@@ -92,6 +92,31 @@ func (p *SLBProvider) GetSLBDetail(slbId string) (*provider.SLBDetail, error) {
 
 // ListSLBListeners lists all listeners on an SLB instance.
 func (p *SLBProvider) ListSLBListeners(slbId string) ([]provider.SLBListener, error) {
-	// TODO: Implement when SDK API is confirmed
-	return nil, fmt.Errorf("ListSLBListeners not yet implemented")
+	request := &slb.DescribeLoadBalancerListenersRequest{
+		LoadBalancerId: []*string{tea.String(slbId)},
+	}
+
+	response, err := p.client.DescribeLoadBalancerListeners(request)
+	if err != nil {
+		return nil, fmt.Errorf("DescribeLoadBalancerListeners failed: %w", err)
+	}
+
+	body := response.Body
+	if body == nil {
+		return nil, fmt.Errorf("empty response body")
+	}
+
+	listeners := make([]provider.SLBListener, 0)
+	if body.Listeners != nil {
+		for _, l := range body.Listeners {
+			listeners = append(listeners, provider.SLBListener{
+				ListenerPort:     int(tea.Int32Value(l.ListenerPort)),
+				ListenerProtocol: tea.StringValue(l.ListenerProtocol),
+				Status:           tea.StringValue(l.Status),
+				Bandwidth:        int(tea.Int32Value(l.Bandwidth)),
+			})
+		}
+	}
+
+	return listeners, nil
 }

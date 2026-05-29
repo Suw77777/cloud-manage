@@ -101,6 +101,34 @@ func (p *VPCProvider) GetVPCDetail(vpcId string) (*provider.VPCDetail, error) {
 
 // ListVSwitches lists all VSwitches in a VPC.
 func (p *VPCProvider) ListVSwitches(vpcId string) ([]provider.VSwitch, error) {
-	// TODO: Implement when SDK field names are confirmed
-	return nil, fmt.Errorf("ListVSwitches not yet implemented")
+	request := &vpc.DescribeVSwitchesRequest{
+		VpcId: tea.String(vpcId),
+	}
+
+	response, err := p.client.DescribeVSwitches(request)
+	if err != nil {
+		return nil, fmt.Errorf("DescribeVSwitches failed: %w", err)
+	}
+
+	body := response.Body
+	if body == nil {
+		return nil, fmt.Errorf("empty response body")
+	}
+
+	vswitches := make([]provider.VSwitch, 0)
+	if body.VSwitches != nil && body.VSwitches.VSwitch != nil {
+		for _, vs := range body.VSwitches.VSwitch {
+			vswitches = append(vswitches, provider.VSwitch{
+				VSwitchId:    tea.StringValue(vs.VSwitchId),
+				VSwitchName:  tea.StringValue(vs.VSwitchName),
+				CidrBlock:    tea.StringValue(vs.CidrBlock),
+				ZoneId:       tea.StringValue(vs.ZoneId),
+				Status:       tea.StringValue(vs.Status),
+				VpcId:        tea.StringValue(vs.VpcId),
+				CreationTime: tea.StringValue(vs.CreationTime),
+			})
+		}
+	}
+
+	return vswitches, nil
 }
