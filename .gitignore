@@ -10,7 +10,7 @@ cloud-cli
 cloud-manage
 
 # Wails
-build/bin/
+build/
 frontend/dist/
 frontend/node_modules/
 
