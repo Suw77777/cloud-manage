@@ -4,6 +4,8 @@ import { useECS } from './composables/useECS'
 import { useCMS } from './composables/useCMS'
 import { useSLS } from './composables/useSLS'
 import { useOSS } from './composables/useOSS'
+import { useVPC } from './composables/useVPC'
+import { useSLB } from './composables/useSLB'
 import EcsResultTable from './components/EcsResultTable.vue'
 import InstanceDetailModal from './components/InstanceDetailModal.vue'
 import ConfirmDialog from './components/ConfirmDialog.vue'
@@ -11,11 +13,15 @@ import OperationLog from './components/OperationLog.vue'
 import CmsMonitor from './components/CmsMonitor.vue'
 import SlsQuery from './components/SlsQuery.vue'
 import OssBrowser from './components/OssBrowser.vue'
+import VpcManager from './components/VpcManager.vue'
+import SlbManager from './components/SlbManager.vue'
 
 const ecs = useECS()
 const cms = useCMS(ecs.accessKeyId, ecs.accessKeySecret)
 const sls = useSLS(ecs.accessKeyId, ecs.accessKeySecret)
 const oss = useOSS(ecs.accessKeyId, ecs.accessKeySecret)
+const vpc = useVPC(ecs.accessKeyId, ecs.accessKeySecret)
+const slb = useSLB(ecs.accessKeyId, ecs.accessKeySecret)
 
 const activeTab = ref('ecs')
 
@@ -60,7 +66,7 @@ function toggleRegion(regionValue) {
   <div class="app-container">
     <header class="app-header">
       <h1>Cloud 管理小助手</h1>
-      <span class="version">v0.0.8</span>
+      <span class="version">v0.1.0</span>
     </header>
 
     <!-- Tab Navigation -->
@@ -92,6 +98,20 @@ function toggleRegion(regionValue) {
         @click="activeTab = 'oss'"
       >
         OSS 存储
+      </button>
+      <button
+        class="tab-btn"
+        :class="{ active: activeTab === 'vpc' }"
+        @click="activeTab = 'vpc'"
+      >
+        VPC 网络
+      </button>
+      <button
+        class="tab-btn"
+        :class="{ active: activeTab === 'slb' }"
+        @click="activeTab = 'slb'"
+      >
+        负载均衡
       </button>
     </nav>
 
@@ -364,6 +384,110 @@ function toggleRegion(regionValue) {
           @select-bucket="oss.selectBucket"
           @back-to-buckets="oss.backToBuckets"
           @clear="oss.clearResults"
+        />
+      </div>
+
+      <!-- VPC Tab -->
+      <div v-show="activeTab === 'vpc'">
+        <!-- Connection Info Display -->
+        <section class="input-section">
+          <h2>VPC 配置</h2>
+          <div class="form-grid">
+            <div class="form-group">
+              <label>AccessKey ID</label>
+              <input
+                :value="ecs.accessKeyId.value"
+                type="text"
+                placeholder="请在 ECS 页面输入"
+                disabled
+              />
+            </div>
+            <div class="form-group">
+              <label>AccessKey Secret</label>
+              <input
+                :value="ecs.accessKeySecret.value ? '********' : ''"
+                type="text"
+                placeholder="请在 ECS 页面输入"
+                disabled
+              />
+            </div>
+          </div>
+        </section>
+
+        <!-- Error / Success Messages -->
+        <div v-if="vpc.error.value" class="message error-message">
+          {{ vpc.error.value }}
+        </div>
+        <div v-if="vpc.success.value" class="message success-message">
+          {{ vpc.success.value }}
+        </div>
+
+        <!-- VPC Manager Component -->
+        <VpcManager
+          :region="vpc.region.value"
+          :vpcs="vpc.vpcs.value"
+          :vpc-detail="vpc.vpcDetail.value"
+          :vswitches="vpc.vswitches.value"
+          :loading="vpc.loading.value"
+          :loading-detail="vpc.loadingDetail.value"
+          :region-options="regionOptions"
+          @update:region="vpc.region.value = $event"
+          @fetch-vpcs="vpc.fetchVPCs"
+          @fetch-detail="vpc.fetchVPCDetail"
+          @fetch-vswitches="vpc.fetchVSwitches"
+          @clear="vpc.clearResults"
+        />
+      </div>
+
+      <!-- SLB Tab -->
+      <div v-show="activeTab === 'slb'">
+        <!-- Connection Info Display -->
+        <section class="input-section">
+          <h2>SLB 配置</h2>
+          <div class="form-grid">
+            <div class="form-group">
+              <label>AccessKey ID</label>
+              <input
+                :value="ecs.accessKeyId.value"
+                type="text"
+                placeholder="请在 ECS 页面输入"
+                disabled
+              />
+            </div>
+            <div class="form-group">
+              <label>AccessKey Secret</label>
+              <input
+                :value="ecs.accessKeySecret.value ? '********' : ''"
+                type="text"
+                placeholder="请在 ECS 页面输入"
+                disabled
+              />
+            </div>
+          </div>
+        </section>
+
+        <!-- Error / Success Messages -->
+        <div v-if="slb.error.value" class="message error-message">
+          {{ slb.error.value }}
+        </div>
+        <div v-if="slb.success.value" class="message success-message">
+          {{ slb.success.value }}
+        </div>
+
+        <!-- SLB Manager Component -->
+        <SlbManager
+          :region="slb.region.value"
+          :slbs="slb.slbs.value"
+          :slb-detail="slb.slbDetail.value"
+          :listeners="slb.listeners.value"
+          :loading="slb.loading.value"
+          :loading-detail="slb.loadingDetail.value"
+          :region-options="regionOptions"
+          @update:region="slb.region.value = $event"
+          @fetch-slbs="slb.fetchSLBs"
+          @fetch-detail="slb.fetchSLBDetail"
+          @fetch-listeners="slb.fetchListeners"
+          @clear="slb.clearResults"
         />
       </div>
     </main>
