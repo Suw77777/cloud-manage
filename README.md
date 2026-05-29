@@ -23,8 +23,8 @@ wails dev
 # 构建生产版本（GUI + CLI）
 wails build
 
-# 仅构建 CLI（无 GUI 依赖）
-go build -o cloud-manage ./cmd/cli/
+# 仅构建命令行版本（无 GUI 依赖）
+go build -o cloud-manage .
 ```
 
 ### 打包分发
