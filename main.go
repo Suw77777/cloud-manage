@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cloud-manage/internal/consts"
 	"cloud-manage/internal/tui"
 	"cloud-manage/service"
 	"embed"
@@ -19,8 +20,6 @@ import (
 
 //go:embed all:frontend/dist
 var assets embed.FS
-
-const version = "v0.0.12"
 
 var (
 	accessKeyId     string
@@ -58,7 +57,7 @@ func main() {
 	flag.Usage = printUsage
 	flag.Parse()
 
-	fmt.Printf("\n  Cloud 管理小助手 %s\n\n", version)
+	fmt.Printf("\n  Cloud 管理小助手 %s\n\n", consts.Version)
 
 	mode := detectMode()
 
@@ -173,7 +172,7 @@ func runCLI() {
 	case "help":
 		printUsage()
 	case "version":
-		fmt.Printf("  cloud-manage %s\n", version)
+		fmt.Printf("  cloud-manage %s\n", consts.Version)
 	case "ecs":
 		handleECS(action, remainingArgs)
 	case "cms":

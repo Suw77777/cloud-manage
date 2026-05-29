@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"cloud-manage/internal/consts"
 	"fmt"
 	"os"
 
@@ -170,7 +171,7 @@ func (a App) renderLogin() string {
 
 func (a App) renderMain() string {
 	// Title bar
-	title := TitleBarStyle.Width(a.width).Render("Cloud Manage TUI v0.0.13")
+	title := TitleBarStyle.Width(a.width).Render("Cloud Manage TUI " + consts.Version)
 
 	// Tabs
 	tabs := renderTabs(a.activeTab)
