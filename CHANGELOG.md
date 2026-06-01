@@ -1,5 +1,37 @@
 # Changelog
 
+## v0.1.0 (2026-05-29)
+
+### VPC/SLB 管理
+
+- 新增 VPC 网络管理：VPC 列表、详情、VSwitch 列表
+- 新增 SLB 负载均衡管理：SLB 列表、详情、监听器列表
+- 完整实现 Provider → Service → GUI/TUI/CLI 三层架构
+
+### 架构优化
+
+- 统一入口：删除独立 `cmd/cli/` 和 `cmd/tui/`，所有功能通过 `main.go` 访问
+- 统一版本号：创建 `internal/consts` 包集中管理版本
+- 集成测试隔离：Provider 测试使用 `//go:build integration` tag
+
+### 测试完善
+
+- 新增 VPC/SLB Mock Provider 测试
+- 新增 TUI 组件和视图单元测试
+- 新增 VPC/SLB Provider 集成测试
+
+### 前端
+
+- 新增 VPC 管理组件 `VpcManager.vue`
+- 新增 SLB 管理组件 `SlbManager.vue`
+- 新增 `useVPC.js` 和 `useSLB.js` composables
+
+### 文档
+
+- 更新 README 添加 VPC/SLB 使用说明
+- 清理过时的计划文档
+- 清理 git 中的构建产物（build/ 目录）
+
 ## v0.0.9 (2026-05-13)
 
 ### 统一入口

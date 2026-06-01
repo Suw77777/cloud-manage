@@ -102,7 +102,7 @@ export CLOUD_ACCESS_KEY_SECRET=your-key-secret
 
 ```bash
 # 直接运行，无需安装依赖
-./cloud-manage-0.0.12-x86_64.AppImage
+./cloud-manage-v0.1.0-x86_64.AppImage
 ```
 
 ## 通用参数
