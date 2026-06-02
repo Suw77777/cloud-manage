@@ -5,14 +5,14 @@
 set -e
 
 APP_NAME="cloud-manage"
-APP_VERSION="0.0.12"
+APP_VERSION="0.1.0"
 ARCH="x86_64"
 
 echo "Building ${APP_NAME} AppImage..."
 
 # Build CLI binary
 echo "Building CLI binary..."
-CGO_ENABLED=0 go build -o "build/bin/${APP_NAME}" ./cmd/cli/
+CGO_ENABLED=0 go build -o "build/bin/${APP_NAME}" .
 
 # Create AppDir structure
 APPDIR="build/AppDir"

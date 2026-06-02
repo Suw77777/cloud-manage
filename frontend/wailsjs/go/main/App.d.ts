@@ -29,3 +29,19 @@ export function RebootECS(arg1:string,arg2:string,arg3:string,arg4:string,arg5:b
 export function StartECS(arg1:string,arg2:string,arg3:string,arg4:string):Promise<main.OperationResult>;
 
 export function StopECS(arg1:string,arg2:string,arg3:string,arg4:string,arg5:boolean):Promise<main.OperationResult>;
+
+export function GetSupportedCloudProducts():Promise<main.CloudProductResult>;
+
+export function GetCloudProductMetrics(arg1:string):Promise<main.CloudProductResult>;
+
+export function ListVPCs(arg1:string,arg2:string,arg3:string):Promise<main.VPCListResult>;
+
+export function GetVPCDetail(arg1:string,arg2:string,arg3:string,arg4:string):Promise<main.VPCDetailResult>;
+
+export function ListVSwitches(arg1:string,arg2:string,arg3:string,arg4:string):Promise<main.VSwitchListResult>;
+
+export function ListSLBs(arg1:string,arg2:string,arg3:string):Promise<main.SLBListResult>;
+
+export function GetSLBDetail(arg1:string,arg2:string,arg3:string,arg4:string):Promise<main.SLBDetailResult>;
+
+export function ListSLBListeners(arg1:string,arg2:string,arg3:string,arg4:string):Promise<main.SLBListenerListResult>;

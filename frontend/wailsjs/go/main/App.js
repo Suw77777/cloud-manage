@@ -57,3 +57,35 @@ export function StartECS(arg1, arg2, arg3, arg4) {
 export function StopECS(arg1, arg2, arg3, arg4, arg5) {
   return window['go']['main']['App']['StopECS'](arg1, arg2, arg3, arg4, arg5);
 }
+
+export function GetSupportedCloudProducts() {
+  return window['go']['main']['App']['GetSupportedCloudProducts']();
+}
+
+export function GetCloudProductMetrics(arg1) {
+  return window['go']['main']['App']['GetCloudProductMetrics'](arg1);
+}
+
+export function ListVPCs(arg1, arg2, arg3) {
+  return window['go']['main']['App']['ListVPCs'](arg1, arg2, arg3);
+}
+
+export function GetVPCDetail(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['GetVPCDetail'](arg1, arg2, arg3, arg4);
+}
+
+export function ListVSwitches(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['ListVSwitches'](arg1, arg2, arg3, arg4);
+}
+
+export function ListSLBs(arg1, arg2, arg3) {
+  return window['go']['main']['App']['ListSLBs'](arg1, arg2, arg3);
+}
+
+export function GetSLBDetail(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['GetSLBDetail'](arg1, arg2, arg3, arg4);
+}
+
+export function ListSLBListeners(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['ListSLBListeners'](arg1, arg2, arg3, arg4);
+}
