@@ -9,9 +9,9 @@ PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 
 cd "$PROJECT_DIR"
 
-VERSION=$(grep 'const version' main.go | cut -d'"' -f2)
+VERSION=$(grep 'const Version' internal/consts/version.go | cut -d'"' -f2)
 if [ -z "$VERSION" ]; then
-    VERSION="v0.0.9"
+    VERSION="v0.1.0"
 fi
 
 OUTPUT_DIR="release"

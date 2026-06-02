@@ -43,11 +43,6 @@ for PLATFORM in "${PLATFORMS[@]}"; do
         -ldflags "-s -w" \
         -o "${OUTPUT_DIR}/${OUTPUT_NAME}" \
         .
-
-    if [ $? -ne 0 ]; then
-        echo "  ERROR: Failed to build ${OUTPUT_NAME}"
-        exit 1
-    fi
 done
 
 # Generate checksums
