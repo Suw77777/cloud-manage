@@ -36,16 +36,25 @@
 
 ### 统一入口
 
-- 合并 GUI 和 CLI 为单一二进制文件 `cloud-manage`
+- 合并 GUI、CLI、TUI 为单一二进制文件 `cloud-manage`
 - 自动检测图形环境：有 DISPLAY 启动 GUI，无 DISPLAY 进入 CLI
 - 新增 `--gui` 标志强制启动 GUI 模式
 - 新增 `--cli` 标志强制 CLI 模式
+- 新增 `--tui` 标志强制 TUI 模式
 - 检测到子命令（ecs/cms/sls/oss）自动进入 CLI 模式
 - 启动时显示当前模式提示信息
 - 新增 `help` 子命令显示帮助信息
 - 新增 `version` 子命令显示版本号
 - 支持 `--help` / `-h` 标志
-- 删除独立的 `cmd/cli/` 目录，逻辑合并到 `main.go`
+- 删除独立的 `cmd/cli/` 和 `cmd/tui/` 目录，逻辑合并到 `main.go`
+
+### TUI 终端界面
+
+- 使用 Bubble Tea 框架实现终端用户界面
+- 登录界面：输入 AccessKey ID/Secret、Region、环境选择
+- Tab 导航切换服务：ECS、CMS、SLS、OSS、VPC、SLB
+- 方向键导航列表，Enter 查看详情
+- 支持所有 CLI 功能的交互式操作
 
 ### 使用方式
 
@@ -55,6 +64,9 @@ cloud-manage
 
 # 强制 GUI 模式
 cloud-manage --gui
+
+# 强制 TUI 模式
+cloud-manage --tui
 
 # CLI 模式（自动检测或显式指定）
 cloud-manage ecs list
