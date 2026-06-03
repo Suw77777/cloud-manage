@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cloud-manage/internal/config"
 	"cloud-manage/internal/consts"
 	"cloud-manage/internal/tui"
 	"cloud-manage/service"
@@ -9,6 +10,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 	"time"
 
@@ -49,6 +51,7 @@ var knownServices = map[string]bool{
 	"oss":     true,
 	"vpc":     true,
 	"slb":     true,
+	"config":  true,
 	"help":    true,
 	"version": true,
 }
@@ -173,6 +176,8 @@ func runCLI() {
 		printUsage()
 	case "version":
 		fmt.Printf("  cloud-manage %s\n", consts.Version)
+	case "config":
+		handleConfig(action, remainingArgs)
 	case "ecs":
 		handleECS(action, remainingArgs)
 	case "cms":
@@ -905,4 +910,209 @@ func getAllRegions() []string {
 		"ap-southeast-1", "ap-southeast-2", "ap-southeast-3",
 		"us-east-1", "us-west-1", "eu-central-1", "eu-west-1",
 	}
+}
+
+// ========== Config ==========
+
+func handleConfig(action string, args []string) {
+	switch action {
+	case "init":
+		handleConfigInit(args)
+	case "add":
+		handleConfigAdd(args)
+	case "remove":
+		handleConfigRemove(args)
+	case "list":
+		handleConfigList(args)
+	case "switch":
+		handleConfigSwitch(args)
+	case "show":
+		handleConfigShow(args)
+	case "reset":
+		handleConfigReset(args)
+	default:
+		fmt.Println(`Config Actions:
+  init              初始化配置文件
+  add <profile>     添加账号
+  remove <profile>  删除账号
+  list              列出所有账号
+  switch <profile>  切换默认账号
+  show              显示当前账号
+  reset             重置配置文件（删除所有凭证）`)
+	}
+}
+
+func handleConfigInit(args []string) {
+	// Check if config already exists
+	if config.HasConfig() {
+		fmt.Fprintf(os.Stderr, "配置文件已存在: ")
+		path, _ := config.GetConfigPath()
+		fmt.Fprintf(os.Stderr, "%s\n", path)
+		fmt.Fprintf(os.Stderr, "使用 --force 参数强制重新生成\n")
+		os.Exit(1)
+	}
+
+	// Init config
+	if err := config.InitConfig(false); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	path, _ := config.GetConfigPath()
+	fmt.Printf("配置文件已生成: %s\n", path)
+	fmt.Println("请编辑配置文件，填入您的云账号凭证。")
+}
+
+func handleConfigAdd(args []string) {
+	if len(args) < 1 {
+		fmt.Fprintf(os.Stderr, "Usage: cloud-manage config add <profile>\n")
+		os.Exit(1)
+	}
+
+	profileName := args[0]
+
+	// Check if config exists
+	if !config.HasConfig() {
+		fmt.Println("配置文件不存在，正在初始化...")
+		if err := config.InitConfig(false); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+	}
+
+	// Read credentials from flags or environment
+	akId := accessKeyId
+	if akId == "" {
+		akId = os.Getenv("CLOUD_ACCESS_KEY_ID")
+	}
+	akSecret := accessKeySecret
+	if akSecret == "" {
+		akSecret = os.Getenv("CLOUD_ACCESS_KEY_SECRET")
+	}
+	profileRegion := region
+
+	if akId == "" || akSecret == "" {
+		fmt.Fprintf(os.Stderr, "Error: AccessKey ID and Secret are required.\n")
+		fmt.Fprintf(os.Stderr, "Use -id/-secret flags or set CLOUD_ACCESS_KEY_ID/CLOUD_ACCESS_KEY_SECRET environment variables.\n")
+		os.Exit(1)
+	}
+
+	// Create profile
+	profile := &config.Profile{
+		AccessKeyID:     akId,
+		AccessKeySecret: akSecret,
+		Region:          profileRegion,
+	}
+
+	// Add profile
+	if err := config.AddProfile(profileName, profile); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Printf("账号 '%s' 已添加。\n", profileName)
+}
+
+func handleConfigRemove(args []string) {
+	if len(args) < 1 {
+		fmt.Fprintf(os.Stderr, "Usage: cloud-manage config remove <profile>\n")
+		os.Exit(1)
+	}
+
+	profileName := args[0]
+
+	if err := config.RemoveProfile(profileName); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Printf("账号 '%s' 已删除。\n", profileName)
+}
+
+func handleConfigList(args []string) {
+	cfg, err := config.Load()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	if len(cfg.Profiles) == 0 {
+		fmt.Println("没有配置任何账号。")
+		fmt.Println("使用 'cloud-manage config add <profile>' 添加账号。")
+		return
+	}
+
+	fmt.Println("已配置的账号:")
+	fmt.Println()
+
+	// Sort profile names
+	names := make([]string, 0, len(cfg.Profiles))
+	for name := range cfg.Profiles {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
+	for _, name := range names {
+		profile := cfg.Profiles[name]
+		marker := " "
+		if name == cfg.CurrentProfile {
+			marker = "*"
+		}
+		fmt.Printf("  %s %-15s %-20s %s\n", marker, name, profile.AccessKeyID, profile.Region)
+	}
+
+	fmt.Println()
+	fmt.Println("* 表示当前使用的账号")
+}
+
+func handleConfigSwitch(args []string) {
+	if len(args) < 1 {
+		fmt.Fprintf(os.Stderr, "Usage: cloud-manage config switch <profile>\n")
+		os.Exit(1)
+	}
+
+	profileName := args[0]
+
+	if err := config.SwitchProfile(profileName); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Printf("已切换到账号 '%s'。\n", profileName)
+}
+
+func handleConfigShow(args []string) {
+	cfg, err := config.Load()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	if cfg.CurrentProfile == "" {
+		fmt.Println("当前没有设置默认账号。")
+		fmt.Println("使用 'cloud-manage config switch <profile>' 切换账号。")
+		return
+	}
+
+	profile, ok := cfg.Profiles[cfg.CurrentProfile]
+	if !ok {
+		fmt.Fprintf(os.Stderr, "Error: 当前账号 '%s' 不存在。\n", cfg.CurrentProfile)
+		os.Exit(1)
+	}
+
+	fmt.Printf("当前账号: %s\n", cfg.CurrentProfile)
+	fmt.Printf("  AccessKey ID: %s\n", profile.AccessKeyID)
+	fmt.Printf("  Region:       %s\n", profile.Region)
+	if profile.Endpoint != "" {
+		fmt.Printf("  Endpoint:     %s\n", profile.Endpoint)
+	}
+}
+
+func handleConfigReset(args []string) {
+	if err := config.ResetConfig(); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Println("配置文件已重置。")
 }
