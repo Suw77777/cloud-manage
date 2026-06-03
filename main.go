@@ -136,15 +136,91 @@ func runTUI() {
 	}
 }
 
+// loadCredentials loads credentials with priority: command line > env > config file > default
+func loadCredentials() {
+	// Priority 1: Command line flags (already set)
+	// Priority 2: Environment variables
+	envAK := os.Getenv("CLOUD_ACCESS_KEY_ID")
+	envSK := os.Getenv("CLOUD_ACCESS_KEY_SECRET")
+	envRegion := os.Getenv("CLOUD_REGION")
+
+	// Priority 3: Config file
+	var cfgAK, cfgSK, cfgRegion string
+	if config.HasConfig() {
+		cfg, err := config.Load()
+		if err == nil && cfg.CurrentProfile != "" {
+			if profile, ok := cfg.Profiles[cfg.CurrentProfile]; ok {
+				cfgAK = profile.AccessKeyID
+				cfgSK = profile.AccessKeySecret
+				cfgRegion = profile.Region
+			}
+		}
+	}
+
+	// Apply priority and warn on conflicts
+	if accessKeyId == "" {
+		if envAK != "" {
+			accessKeyId = envAK
+			if cfgAK != "" && envAK != cfgAK {
+				fmt.Fprintf(os.Stderr, "警告: 使用环境变量 CLOUD_ACCESS_KEY_ID，与配置文件不一致\n")
+			}
+		} else if cfgAK != "" {
+			accessKeyId = cfgAK
+		}
+	} else {
+		if envAK != "" && accessKeyId != envAK {
+			fmt.Fprintf(os.Stderr, "警告: 使用命令行参数 -id，与环境变量不一致\n")
+		}
+		if cfgAK != "" && accessKeyId != cfgAK {
+			fmt.Fprintf(os.Stderr, "警告: 使用命令行参数 -id，与配置文件不一致\n")
+		}
+	}
+
+	if accessKeySecret == "" {
+		if envSK != "" {
+			accessKeySecret = envSK
+			if cfgSK != "" && envSK != cfgSK {
+				fmt.Fprintf(os.Stderr, "警告: 使用环境变量 CLOUD_ACCESS_KEY_SECRET，与配置文件不一致\n")
+			}
+		} else if cfgSK != "" {
+			accessKeySecret = cfgSK
+		}
+	} else {
+		if envSK != "" && accessKeySecret != envSK {
+			fmt.Fprintf(os.Stderr, "警告: 使用命令行参数 -secret，与环境变量不一致\n")
+		}
+		if cfgSK != "" && accessKeySecret != cfgSK {
+			fmt.Fprintf(os.Stderr, "警告: 使用命令行参数 -secret，与配置文件不一致\n")
+		}
+	}
+
+	// Handle region with default
+	defaultRegion := "cn-hangzhou"
+	if region == defaultRegion {
+		// User didn't set -region flag
+		if envRegion != "" {
+			region = envRegion
+			if cfgRegion != "" && envRegion != cfgRegion {
+				fmt.Fprintf(os.Stderr, "警告: 使用环境变量 CLOUD_REGION，与配置文件不一致\n")
+			}
+		} else if cfgRegion != "" {
+			region = cfgRegion
+		}
+	} else {
+		// User set -region flag
+		if envRegion != "" && region != envRegion {
+			fmt.Fprintf(os.Stderr, "警告: 使用命令行参数 -region，与环境变量不一致\n")
+		}
+		if cfgRegion != "" && region != cfgRegion {
+			fmt.Fprintf(os.Stderr, "警告: 使用命令行参数 -region，与配置文件不一致\n")
+		}
+	}
+}
+
 // runCLI processes command-line operations.
 func runCLI() {
-	// Get credentials from flags or environment
-	if accessKeyId == "" {
-		accessKeyId = os.Getenv("CLOUD_ACCESS_KEY_ID")
-	}
-	if accessKeySecret == "" {
-		accessKeySecret = os.Getenv("CLOUD_ACCESS_KEY_SECRET")
-	}
+	// Load credentials with priority handling
+	loadCredentials()
 
 	args := flag.Args()
 	if len(args) == 0 {
@@ -159,10 +235,11 @@ func runCLI() {
 	}
 
 	// Validate credentials (not needed for help display or product listing)
-	needsCredentials := action != "" && !(serviceName == "cms" && action == "products")
+	needsCredentials := action != "" && !(serviceName == "cms" && action == "products") && serviceName != "config"
 	if needsCredentials && (accessKeyId == "" || accessKeySecret == "") {
 		fmt.Fprintf(os.Stderr, "Error: AccessKey ID and Secret are required.\n")
-		fmt.Fprintf(os.Stderr, "Use -id/-secret flags or set CLOUD_ACCESS_KEY_ID/CLOUD_ACCESS_KEY_SECRET environment variables.\n")
+		fmt.Fprintf(os.Stderr, "Use -id/-secret flags, set CLOUD_ACCESS_KEY_ID/CLOUD_ACCESS_KEY_SECRET environment variables,\n")
+		fmt.Fprintf(os.Stderr, "or use 'cloud-manage config add <profile>' to configure credentials.\n")
 		os.Exit(1)
 	}
 
