@@ -4,33 +4,214 @@
 
 **目标**: 多账号凭证管理、SLS 日志导出、性能和体验提升
 
-### 凭证管理（多账号切换）
-- [ ] 配置文件支持 (`~/.cloud-manage/config.yaml`)
-- [ ] 多账号 Profile 存储（加密存储 AK/SK）
-- [ ] `config` 子命令管理凭证（add/remove/list/switch）
-- [ ] GUI/TUI 账号选择器
-- [ ] 默认账号设置
-- [ ] 环境变量覆盖配置文件
+### 设计决策记录
 
-### SLS 日志增强
-- [ ] 日志导出功能（CSV/JSON 格式）
-- [ ] CLI `sls export` 子命令
-- [ ] GUI 导出按钮
-- [ ] 大量日志分页优化（虚拟滚动）
-- [ ] 日志时间范围快捷选择
+#### 决策 1: 凭证加密方案
+- **选择**: 主密码 + AES-256-GCM 加密
+- **理由**: 简单，用户容易理解，不依赖外部工具
+- **工作流程**: 首次使用设置主密码，后续每次启动输入主密码解锁
 
-### 性能优化
-- [ ] 启动速度优化（延迟加载 SDK）
-- [ ] 内存占用优化（按需初始化 Provider）
-- [ ] 前端构建产物压缩
-- [ ] TUI 启动优化
+#### 决策 2: 主密码缓存策略
+- **选择**: 仅当前会话（程序退出就忘记）
+- **理由**: 安全性优先，避免密码泄露风险
 
-### 体验优化
-- [ ] GUI 界面美化（统一设计风格）
-- [ ] TUI 键盘快捷键完善
-- [ ] 错误提示友好化
-- [ ] 加载状态动画
-- [ ] 暗色主题支持
+#### 决策 3: 配置文件格式
+- **选择**: YAML
+- **理由**: 可读性好，Go 支持成熟
+
+#### 决策 4: 配置文件位置
+- **选择**: 跨平台标准位置（`os.UserConfigDir()`）
+  - Linux: `~/.config/cloud-manage/config.yaml`
+  - macOS: `~/Library/Application Support/cloud-manage/config.yaml`
+  - Windows: `%APPDATA%\cloud-manage\config.yaml`
+- **理由**: 遵循各平台标准
+
+#### 决策 5: Profile 配置结构
+- **选择**: 每个 profile 独立配置 region/endpoint
+- **理由**: 简单明确，没有隐式行为
+
+#### 决策 6: 参数优先级
+- **选择**: 命令行参数 > 环境变量 > 配置文件 > 默认值
+- **理由**: 符合 Unix 惯例，适合 CI/CD 场景
+
+#### 决策 7: 环境变量与配置文件不一致处理
+- **选择**: 打印警告，继续执行
+- **范围**: 所有参数（AK/SK、region、endpoint）不一致都提醒
+- **理由**: 不中断流程，但让用户知道当前使用的值
+
+#### 决策 8: SLS 导出范围
+- **选择**: 可以选择范围或已选的日志
+- **限制**: 大于 5000 条日志直接拒绝
+- **理由**: 避免大数据量问题
+
+#### 决策 9: SLS 导出文件命名
+- **选择**: 默认自动生成（包含项目、logstore、时间戳），`--output` 可覆盖
+- **理由**: 灵活，用户不指定时有有意义的文件名
+
+---
+
+### 1. 凭证管理（多账号切换）
+
+**存储位置**: 跨平台标准位置（见决策 4）
+
+**配置文件格式**:
+```yaml
+current_profile: prod
+profiles:
+  prod:
+    access_key_id: "LTAI4xxx"
+    access_key_secret: "encrypted:xxxx"  # AES-256-GCM 加密
+    region: "cn-hangzhou"
+  dev:
+    access_key_id: "LTAI4xxx"
+    access_key_secret: "encrypted:xxxx"
+    region: "cn-shanghai"
+    endpoint: "ecs.cn-shanghai.aliyuncs.com"  # 可选自定义 endpoint
+```
+
+**加密方案** (决策 1):
+- 算法: AES-256-GCM
+- 密钥派生: 用户主密码 → PBKDF2 (100000 iterations) → 256-bit key
+- 首次使用时设置主密码，后续每次启动输入主密码解锁
+- 缓存策略: 仅当前会话（决策 2）
+
+**CLI 命令**:
+```bash
+# 配置管理
+cloud-manage config init              # 初始化配置文件
+cloud-manage config add <profile>     # 添加账号
+cloud-manage config remove <profile>  # 删除账号
+cloud-manage config list              # 列出所有账号
+cloud-manage config switch <profile>  # 切换默认账号
+cloud-manage config show              # 显示当前账号
+
+# 使用指定账号
+cloud-manage --profile dev ecs list
+```
+
+**参数优先级** (决策 6):
+1. 命令行参数 (`--region cn-shanghai`)
+2. 环境变量 (`CLOUD_REGION=cn-shanghai`)
+3. 配置文件 (`region: "cn-hangzhou"`)
+4. 默认值 (`cn-hangzhou`)
+
+**不一致提醒** (决策 7):
+- 当环境变量与配置文件不一致时，打印警告，继续执行
+- 所有参数（AK/SK、region、endpoint）都提醒
+
+**GUI/TUI**:
+- 登录界面增加"选择账号"下拉框
+- 支持在界面中切换账号
+- 首次使用引导设置主密码
+
+**优先级**: 高 - 这是基础设施，其他功能依赖它
+
+---
+
+### 2. SLS 日志增强
+
+**导出功能** (决策 8、9):
+```bash
+# CLI 导出
+cloud-manage sls export <project> <logstore> --format csv --output logs.csv
+cloud-manage sls export <project> <logstore> --format json --output logs.json
+
+# 支持查询过滤
+cloud-manage sls export <project> <logstore> --query "level: ERROR" --from "2024-01-01" --to "2024-01-02"
+
+# 不指定文件名时自动生成
+cloud-manage sls export <project> <logstore> --format csv
+# 生成: sls_project_logstore_20240101_120000.csv
+```
+
+**导出限制**:
+- 导出范围: 可以选择范围或已选的日志
+- 数量限制: 大于 5000 条日志直接拒绝
+- 理由: 避免大数据量问题
+
+**GUI 导出**:
+- 查询结果区域增加"导出"按钮
+- 支持选择导出格式 (CSV/JSON)
+- 支持选择导出范围（全部/已选/查询范围）
+- 超过 5000 条时提示用户缩小范围
+
+**大结果集优化**:
+- 虚拟滚动：只渲染可见区域的 DOM
+- 分页查询：支持分页显示
+
+**优先级**: 中 - 高频需求，但不阻塞其他功能
+
+---
+
+### 3. 性能优化
+
+**优化清单**:
+
+| 优化点 | 说明 | 状态 |
+|--------|------|------|
+| A. 模式相关初始化 | 只初始化当前模式需要的组件 | 待做 |
+| B. SDK 客户端复用 | 多次查询复用同一个客户端 | 待做 |
+| C. 前端产物压缩 | Vite 构建时启用 gzip/brotli 压缩 | 待做 |
+| D. Go 编译优化 | `-ldflags "-s -w"` 减小二进制体积，`-trimpath` 移除路径信息 | 待做 |
+| E. GC 调优 | 设置 `GOMEMLIMIT` 控制内存上限 | 待做 |
+| F. 懒加载 embed.FS | GUI 模式才解压前端资源 | 待做 |
+| G. 并发查询优化 | 多 Region 查询时控制并发数，避免打满连接 | 待做 |
+
+**优先级**: 中 - 预防性优化，提升体验
+
+---
+
+### 4. 体验优化
+
+**GUI 界面**:
+- 统一色彩方案 (主色、辅色、强调色)
+- 统一按钮、输入框、表格样式
+- 增加加载动画、过渡效果
+- 响应式布局优化
+
+**TUI 体验**:
+- 完善键盘快捷键 (j/k 导航, / 搜索, q 退出)
+- 增加帮助面板 (? 键显示)
+- 状态栏显示当前操作
+- 颜色主题支持
+
+**错误处理**:
+- 友好的错误消息（非技术语言）
+- 错误码 + 详细说明链接
+- 操作建议（如"请检查 AK/SK 是否正确"）
+
+**优先级**: 低 - 锦上添花，最后做
+
+---
+
+### 实施顺序
+
+```
+Phase 1: 凭证管理
+├── 配置文件读写
+├── 加密存储
+├── CLI config 子命令
+└── GUI/TUI 账号选择器
+
+Phase 2: SLS 增强
+├── CLI export 子命令
+├── GUI 导出按钮
+└── 大结果集优化
+
+Phase 3: 性能优化
+├── 模式相关初始化
+├── SDK 客户端复用
+├── 前端产物压缩
+├── Go 编译优化
+├── GC 调优
+├── 懒加载 embed.FS
+└── 并发查询优化
+
+Phase 4: 体验优化
+├── GUI 界面美化
+├── TUI 快捷键
+└── 暗色主题
+```
 
 ---
 
