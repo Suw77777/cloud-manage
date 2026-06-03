@@ -40,6 +40,7 @@ for PLATFORM in "${PLATFORMS[@]}"; do
 
     echo "  Building ${OUTPUT_NAME}..."
     env CGO_ENABLED=0 GOOS="$GOOS" GOARCH="$GOARCH" go build \
+        -trimpath \
         -ldflags "-s -w" \
         -o "${OUTPUT_DIR}/${OUTPUT_NAME}" \
         .

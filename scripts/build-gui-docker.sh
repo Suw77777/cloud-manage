@@ -30,7 +30,7 @@ docker run --rm \
     -v "$(pwd):/app" \
     -v "$HOME/go/pkg/mod:/root/go/pkg/mod" \
     cloud-manage-builder \
-    bash -c "wails build && cp build/bin/cloud-manage /app/release/cloud-manage-linux-amd64"
+    bash -c "wails build -trimpath -ldflags '-s -w' && cp build/bin/cloud-manage /app/release/cloud-manage-linux-amd64"
 
 echo ""
 echo "==> Build complete!"

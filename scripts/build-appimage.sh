@@ -12,7 +12,7 @@ echo "Building ${APP_NAME} AppImage..."
 
 # Build CLI binary
 echo "Building CLI binary..."
-CGO_ENABLED=0 go build -o "build/bin/${APP_NAME}" .
+CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o "build/bin/${APP_NAME}" .
 
 # Create AppDir structure
 APPDIR="build/AppDir"
