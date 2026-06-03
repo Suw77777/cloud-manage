@@ -10,7 +10,9 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"runtime/debug"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -60,6 +62,9 @@ func main() {
 	flag.Usage = printUsage
 	flag.Parse()
 
+	// Set memory limit
+	setMemoryLimit()
+
 	fmt.Printf("\n  Cloud 管理小助手 %s\n\n", consts.Version)
 
 	mode := detectMode()
@@ -72,6 +77,33 @@ func main() {
 	case "cli":
 		runCLI()
 	}
+}
+
+// setMemoryLimit sets the memory limit from config, env var, or default.
+func setMemoryLimit() {
+	defaultLimit := 256 // MB
+
+	// Priority: env var > config file > default
+	limitMB := defaultLimit
+
+	// Check config file
+	if config.HasConfig() {
+		cfg, err := config.Load()
+		if err == nil && cfg.MemoryLimit > 0 {
+			limitMB = cfg.MemoryLimit
+		}
+	}
+
+	// Check env var (overrides config)
+	if envLimit := os.Getenv("CLOUD_MEMORY_LIMIT"); envLimit != "" {
+		if parsed, err := strconv.Atoi(envLimit); err == nil && parsed > 0 {
+			limitMB = parsed
+		}
+	}
+
+	// Set memory limit
+	limitBytes := int64(limitMB) * 1024 * 1024
+	debug.SetMemoryLimit(limitBytes)
 }
 
 // detectMode determines whether to run in GUI, TUI, or CLI mode.
