@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useECS } from './composables/useECS'
 import { useCMS } from './composables/useCMS'
 import { useSLS } from './composables/useSLS'
@@ -24,6 +24,29 @@ const vpc = useVPC(ecs.accessKeyId, ecs.accessKeySecret)
 const slb = useSLB(ecs.accessKeyId, ecs.accessKeySecret)
 
 const activeTab = ref('ecs')
+const theme = ref('auto')
+
+function applyTheme(t) {
+  if (t === 'dark' || (t === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+    document.documentElement.setAttribute('data-theme', 'dark')
+  } else {
+    document.documentElement.removeAttribute('data-theme')
+  }
+}
+
+function toggleTheme() {
+  const themes = ['auto', 'light', 'dark']
+  const idx = themes.indexOf(theme.value)
+  theme.value = themes[(idx + 1) % themes.length]
+  applyTheme(theme.value)
+}
+
+onMounted(() => {
+  applyTheme(theme.value)
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+    if (theme.value === 'auto') applyTheme('auto')
+  })
+})
 
 const envOptions = [
   { label: '开发环境 (dev)', value: 'dev' },
@@ -66,7 +89,10 @@ function toggleRegion(regionValue) {
   <div class="app-container">
     <header class="app-header">
       <h1>Cloud 管理小助手</h1>
-      <span class="version">v0.1.0</span>
+      <span class="version">v0.2.0</span>
+      <button class="theme-toggle" @click="toggleTheme" :title="theme === 'auto' ? '跟随系统' : theme === 'dark' ? '暗色' : '浅色'">
+        {{ theme === 'auto' ? '🖥️' : theme === 'dark' ? '🌙' : '☀️' }}
+      </button>
     </header>
 
     <!-- Tab Navigation -->
