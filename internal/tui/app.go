@@ -124,6 +124,18 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if a.activeTab < TabSLB {
 				a.activeTab++
 			}
+		case key.Matches(msg, Keys.Tab1):
+			a.activeTab = TabECS
+		case key.Matches(msg, Keys.Tab2):
+			a.activeTab = TabCMS
+		case key.Matches(msg, Keys.Tab3):
+			a.activeTab = TabSLS
+		case key.Matches(msg, Keys.Tab4):
+			a.activeTab = TabOSS
+		case key.Matches(msg, Keys.Tab5):
+			a.activeTab = TabVPC
+		case key.Matches(msg, Keys.Tab6):
+			a.activeTab = TabSLB
 		}
 	}
 

@@ -10,8 +10,15 @@ type KeyMap struct {
 	Enter   key.Binding
 	Escape  key.Binding
 	Search  key.Binding
+	Help    key.Binding
 	Refresh key.Binding
 	Region  key.Binding
+	Tab1    key.Binding
+	Tab2    key.Binding
+	Tab3    key.Binding
+	Tab4    key.Binding
+	Tab5    key.Binding
+	Tab6    key.Binding
 	Quit    key.Binding
 }
 
@@ -44,6 +51,10 @@ var Keys = KeyMap{
 		key.WithKeys("/"),
 		key.WithHelp("/", "search"),
 	),
+	Help: key.NewBinding(
+		key.WithKeys("?"),
+		key.WithHelp("?", "help"),
+	),
 	Refresh: key.NewBinding(
 		key.WithKeys("r"),
 		key.WithHelp("r", "refresh"),
@@ -51,6 +62,30 @@ var Keys = KeyMap{
 	Region: key.NewBinding(
 		key.WithKeys("R"),
 		key.WithHelp("R", "change region"),
+	),
+	Tab1: key.NewBinding(
+		key.WithKeys("1"),
+		key.WithHelp("1", "ECS"),
+	),
+	Tab2: key.NewBinding(
+		key.WithKeys("2"),
+		key.WithHelp("2", "CMS"),
+	),
+	Tab3: key.NewBinding(
+		key.WithKeys("3"),
+		key.WithHelp("3", "SLS"),
+	),
+	Tab4: key.NewBinding(
+		key.WithKeys("4"),
+		key.WithHelp("4", "OSS"),
+	),
+	Tab5: key.NewBinding(
+		key.WithKeys("5"),
+		key.WithHelp("5", "VPC"),
+	),
+	Tab6: key.NewBinding(
+		key.WithKeys("6"),
+		key.WithHelp("6", "SLB"),
 	),
 	Quit: key.NewBinding(
 		key.WithKeys("q", "ctrl+c"),
