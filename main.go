@@ -580,6 +580,9 @@ func handleSLS(action string, args []string) {
 			}
 		}
 
+	case "export":
+		handleSLSExport(svc, args)
+
 	case "logs":
 		if len(args) < 2 {
 			fmt.Fprintf(os.Stderr, "Usage: cloud-manage sls logs <project> <logstore> [--query <query>] [--from <timestamp>] [--to <timestamp>] [--max <lines>]\n")
@@ -633,11 +636,96 @@ func handleSLS(action string, args []string) {
 		fmt.Println(`SLS Actions:
   logstores <project>                    列出 Logstore
   logs <project> <logstore> [options]    查询日志
+  export <project> <logstore> [options]  导出日志到文件
+
+Query Options:
     --query, -q <query>    查询表达式
-    --from <timestamp>     开始时间 (Unix timestamp)
-    --to <timestamp>       结束时间 (Unix timestamp)
-    --max <lines>          最大返回行数 (default: 100)`)
+    --from <time>          开始时间 (ISO 8601, 相对时间如 1h/30m/7d, Unix 时间戳)
+    --to <time>            结束时间
+    --max <lines>          最大返回行数 (default: 100, 最大 5000)
+
+Export Options:
+    --format <format>      导出格式 (csv, json, default: csv)
+    --output, -o <file>    输出文件名 (自动生成)`)
 	}
+}
+
+func handleSLSExport(svc *service.SLSService, args []string) {
+	if len(args) < 2 {
+		fmt.Fprintf(os.Stderr, "Usage: cloud-manage sls export <project> <logstore> [--format csv|json] [--output <file>] [--query <query>] [--from <time>] [--to <time>] [--max <lines>]\n")
+		os.Exit(1)
+	}
+
+	project := args[0]
+	logstore := args[1]
+
+	query := ""
+	format := "csv"
+	outputPath := ""
+	fromStr := ""
+	toStr := ""
+	maxLines := int64(1000)
+
+	for i := 2; i < len(args); i++ {
+		switch args[i] {
+		case "--query", "-q":
+			if i+1 < len(args) {
+				query = args[i+1]
+				i++
+			}
+		case "--format", "-f":
+			if i+1 < len(args) {
+				format = args[i+1]
+				i++
+			}
+		case "--output", "-o":
+			if i+1 < len(args) {
+				outputPath = args[i+1]
+				i++
+			}
+		case "--from":
+			if i+1 < len(args) {
+				fromStr = args[i+1]
+				i++
+			}
+		case "--to":
+			if i+1 < len(args) {
+				toStr = args[i+1]
+				i++
+			}
+		case "--max", "-m":
+			if i+1 < len(args) {
+				fmt.Sscanf(args[i+1], "%d", &maxLines)
+				i++
+			}
+		}
+	}
+
+	// Parse time
+	now := time.Now()
+	from, err := service.ParseTime(fromStr, now.Add(-1*time.Hour))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	to, err := service.ParseTime(toStr, now)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Export
+	result, err := svc.ExportLogs(accessKeyId, accessKeySecret, region, project, logstore, query, from, to, maxLines, format, outputPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Printf("导出成功!\n")
+	fmt.Printf("  文件: %s\n", result.FilePath)
+	fmt.Printf("  数量: %d 条\n", result.Count)
+	fmt.Printf("  格式: %s\n", result.Format)
 }
 
 // ========== OSS ==========
