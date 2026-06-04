@@ -45,3 +45,13 @@ export function ListSLBs(arg1:string,arg2:string,arg3:string):Promise<main.SLBLi
 export function GetSLBDetail(arg1:string,arg2:string,arg3:string,arg4:string):Promise<main.SLBDetailResult>;
 
 export function ListSLBListeners(arg1:string,arg2:string,arg3:string,arg4:string):Promise<main.SLBListenerListResult>;
+
+export function ListConfigProfiles():Promise<Array<string>>;
+
+export function GetCurrentProfile():Promise<string>;
+
+export function SwitchProfile(arg1:string):Promise<void>;
+
+export function GetProfileCredentials(arg1:string):Promise<main.ProfileCredentials>;
+
+export function ExportSLSLogs(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string,arg7:string,arg8:string,arg9:string,arg10:number):Promise<main.ExportResult>;

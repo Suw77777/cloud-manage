@@ -36,6 +36,7 @@ const emit = defineEmits([
   'query-logs-stream',
   'page-change',
   'page-size-change',
+  'export-logs',
   'clear'
 ])
 
@@ -173,6 +174,20 @@ const totalPages = computed(() => {
             @click="emit('query-logs-stream')"
           >
             {{ streaming ? '流式查询中...' : '流式查询' }}
+          </button>
+          <button
+            class="btn btn-success"
+            :disabled="loading || streaming || !logs || logs.length === 0"
+            @click="emit('export-logs', 'csv')"
+          >
+            导出 CSV
+          </button>
+          <button
+            class="btn btn-warning"
+            :disabled="loading || streaming || !logs || logs.length === 0"
+            @click="emit('export-logs', 'json')"
+          >
+            导出 JSON
           </button>
           <button class="btn btn-secondary" @click="emit('clear')">清空</button>
         </div>

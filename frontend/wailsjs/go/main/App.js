@@ -89,3 +89,23 @@ export function GetSLBDetail(arg1, arg2, arg3, arg4) {
 export function ListSLBListeners(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['ListSLBListeners'](arg1, arg2, arg3, arg4);
 }
+
+export function ListConfigProfiles() {
+  return window['go']['main']['App']['ListConfigProfiles']();
+}
+
+export function GetCurrentProfile() {
+  return window['go']['main']['App']['GetCurrentProfile']();
+}
+
+export function SwitchProfile(arg1) {
+  return window['go']['main']['App']['SwitchProfile'](arg1);
+}
+
+export function GetProfileCredentials(arg1) {
+  return window['go']['main']['App']['GetProfileCredentials'](arg1);
+}
+
+export function ExportSLSLogs(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10) {
+  return window['go']['main']['App']['ExportSLSLogs'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10);
+}

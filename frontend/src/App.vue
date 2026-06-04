@@ -381,6 +381,7 @@ function toggleRegion(regionValue) {
           @query-logs-stream="sls.queryLogsStream"
           @page-change="sls.setPage"
           @page-size-change="sls.setPageSize"
+          @export-logs="sls.exportLogs"
           @clear="sls.clearAll"
         />
       </div>

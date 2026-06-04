@@ -854,5 +854,39 @@ export namespace main {
 		}
 	}
 
+	export class ProfileCredentials {
+	    accessKeyId: string;
+	    accessKeySecret: string;
+	    region: string;
+
+	    static createFrom(source: any = {}) {
+	        return new ProfileCredentials(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.accessKeyId = source["accessKeyId"];
+	        this.accessKeySecret = source["accessKeySecret"];
+	        this.region = source["region"];
+	    }
+	}
+
+	export class ExportResult {
+	    filePath: string;
+	    count: number;
+	    format: string;
+
+	    static createFrom(source: any = {}) {
+	        return new ExportResult(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.filePath = source["filePath"];
+	        this.count = source["count"];
+	        this.format = source["format"];
+	    }
+	}
+
 }
 

@@ -1,5 +1,5 @@
 import { ref } from 'vue'
-import { ListSLSLogStores, QuerySLSLogs, QuerySLSLogsStream } from '../../wailsjs/go/main/App'
+import { ListSLSLogStores, QuerySLSLogs, QuerySLSLogsStream, ExportSLSLogs } from '../../wailsjs/go/main/App'
 
 export function useSLS(accessKeyId, accessKeySecret) {
   const region = ref('cn-hangzhou')
@@ -221,6 +221,53 @@ export function useSLS(accessKeyId, accessKeySecret) {
     clearResults()
   }
 
+  async function exportLogs(format = 'csv') {
+    if (!accessKeyId.value.trim() || !accessKeySecret.value.trim()) {
+      error.value = '请先输入 AccessKey'
+      return
+    }
+    if (!project.value.trim()) {
+      error.value = '请输入 Project 名称'
+      return
+    }
+    if (!logstore.value) {
+      error.value = '请选择 Logstore'
+      return
+    }
+
+    loading.value = true
+    error.value = ''
+    success.value = ''
+
+    const { from, to } = getTimeRange()
+    const fromStr = new Date(from * 1000).toISOString()
+    const toStr = new Date(to * 1000).toISOString()
+
+    try {
+      const result = await ExportSLSLogs(
+        accessKeyId.value.trim(),
+        accessKeySecret.value.trim(),
+        region.value,
+        project.value.trim(),
+        logstore.value,
+        query.value || '*',
+        fromStr,
+        toStr,
+        format,
+        maxLines.value
+      )
+      if (result.filePath) {
+        success.value = `导出成功: ${result.filePath} (${result.count} 条)`
+      } else {
+        error.value = '导出失败'
+      }
+    } catch (err) {
+      error.value = '导出失败: ' + (err.message || err)
+    } finally {
+      loading.value = false
+    }
+  }
+
   return {
     region,
     project,
@@ -245,6 +292,7 @@ export function useSLS(accessKeyId, accessKeySecret) {
     fetchLogStores,
     queryLogs,
     queryLogsStream,
+    exportLogs,
     getPagedLogs,
     setPage,
     setPageSize,
