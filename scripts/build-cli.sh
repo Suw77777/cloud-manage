@@ -11,7 +11,7 @@ cd "$PROJECT_DIR"
 
 VERSION=$(grep 'const Version' internal/consts/version.go | cut -d'"' -f2)
 if [ -z "$VERSION" ]; then
-    VERSION="v0.1.0"
+    VERSION="v0.2.0"
 fi
 
 OUTPUT_DIR="release"

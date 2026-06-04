@@ -5,7 +5,7 @@
 set -e
 
 APP_NAME="cloud-manage"
-APP_VERSION="0.1.0"
+APP_VERSION="0.2.0"
 ARCH="x86_64"
 
 echo "Building ${APP_NAME} AppImage..."
