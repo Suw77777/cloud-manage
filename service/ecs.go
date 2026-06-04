@@ -209,13 +209,25 @@ func (s *ECSService) RebootInstance(accessKeyId, accessKeySecret, region, instan
 
 // ListInstancesMultiRegion queries ECS instances for multiple regions concurrently.
 func (s *ECSService) ListInstancesMultiRegion(accessKeyId, accessKeySecret string, regions []string) []RegionResult {
+	return s.ListInstancesMultiRegionWithConcurrency(accessKeyId, accessKeySecret, regions, 3)
+}
+
+// ListInstancesMultiRegionWithConcurrency queries ECS instances for multiple regions with concurrency control.
+func (s *ECSService) ListInstancesMultiRegionWithConcurrency(accessKeyId, accessKeySecret string, regions []string, concurrency int) []RegionResult {
+	if concurrency < 1 {
+		concurrency = 3
+	}
+
 	results := make([]RegionResult, len(regions))
 	var wg sync.WaitGroup
+	semaphore := make(chan struct{}, concurrency)
 
 	for i, region := range regions {
 		wg.Add(1)
+		semaphore <- struct{}{} // Acquire semaphore
 		go func(idx int, rgn string) {
 			defer wg.Done()
+			defer func() { <-semaphore }() // Release semaphore
 
 			result, err := s.ListInstances(accessKeyId, accessKeySecret, rgn)
 			if err != nil {

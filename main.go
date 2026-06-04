@@ -378,6 +378,30 @@ Environment Variables:
 
 // ========== ECS ==========
 
+func getConcurrency() int {
+	defaultConcurrency := 3
+
+	// Priority: env var > config file > default
+	concurrency := defaultConcurrency
+
+	// Check config file
+	if config.HasConfig() {
+		cfg, err := config.Load()
+		if err == nil && cfg.Concurrency > 0 {
+			concurrency = cfg.Concurrency
+		}
+	}
+
+	// Check env var (overrides config)
+	if envConcurrency := os.Getenv("CLOUD_CONCURRENCY"); envConcurrency != "" {
+		if parsed, err := strconv.Atoi(envConcurrency); err == nil && parsed > 0 {
+			concurrency = parsed
+		}
+	}
+
+	return concurrency
+}
+
 func handleECS(action string, args []string) {
 	svc := service.NewECSService()
 
@@ -399,7 +423,8 @@ func handleECS(action string, args []string) {
 				printInstances(result.Instances, regions[0])
 			}
 		} else {
-			results := svc.ListInstancesMultiRegion(accessKeyId, accessKeySecret, regions)
+			concurrency := getConcurrency()
+			results := svc.ListInstancesMultiRegionWithConcurrency(accessKeyId, accessKeySecret, regions, concurrency)
 			if outputJSON {
 				printJSON(results)
 			} else {
