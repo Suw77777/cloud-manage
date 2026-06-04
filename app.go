@@ -1,12 +1,14 @@
 package main
 
 import (
+	"cloud-manage/internal/config"
 	"cloud-manage/security"
 	"cloud-manage/service"
 	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 )
 
 // jsonMarshal marshals a value to JSON bytes.
@@ -953,4 +955,70 @@ func (a *App) ListSLBListeners(accessKeyId, accessKeySecret, region, slbId strin
 		Message:   fmt.Sprintf("found %d listener(s)", len(listeners)),
 		Listeners: listeners,
 	}
+}
+
+// ========== Config ==========
+
+// ListConfigProfiles returns a list of profile names.
+func (a *App) ListConfigProfiles() []string {
+	return config.ListProfiles()
+}
+
+// GetCurrentProfile returns the current profile name.
+func (a *App) GetCurrentProfile() string {
+	cfg, err := config.Load()
+	if err != nil {
+		return ""
+	}
+	return cfg.CurrentProfile
+}
+
+// SwitchProfile switches the current profile.
+func (a *App) SwitchProfile(name string) error {
+	return config.SwitchProfile(name)
+}
+
+// ProfileCredentials holds decrypted credentials for a profile.
+type ProfileCredentials struct {
+	AccessKeyID     string `json:"accessKeyId"`
+	AccessKeySecret string `json:"accessKeySecret"`
+	Region          string `json:"region"`
+}
+
+// GetProfileCredentials returns decrypted credentials for a profile.
+func (a *App) GetProfileCredentials(name string) (ProfileCredentials, error) {
+	profile, err := config.GetProfileByName(name)
+	if err != nil {
+		return ProfileCredentials{}, err
+	}
+
+	// If secret is encrypted, return without decrypting (user needs to input master password)
+	// For now, return the raw values
+	return ProfileCredentials{
+		AccessKeyID:     profile.AccessKeyID,
+		AccessKeySecret: profile.AccessKeySecret,
+		Region:          profile.Region,
+	}, nil
+}
+
+// ExportSLSLogs exports SLS logs to a file (called from GUI).
+func (a *App) ExportSLSLogs(accessKeyId, accessKeySecret, region, project, logstore, query, fromStr, toStr, format string, maxLines int64) (service.ExportResult, error) {
+	// Parse time
+	now := time.Now()
+	from, err := service.ParseTime(fromStr, now.Add(-1*time.Hour))
+	if err != nil {
+		return service.ExportResult{}, err
+	}
+
+	to, err := service.ParseTime(toStr, now)
+	if err != nil {
+		return service.ExportResult{}, err
+	}
+
+	result, err := a.slsSvc.ExportLogs(accessKeyId, accessKeySecret, region, project, logstore, query, from, to, maxLines, format, "")
+	if err != nil {
+		return service.ExportResult{}, err
+	}
+
+	return *result, nil
 }

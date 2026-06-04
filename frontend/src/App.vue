@@ -6,6 +6,7 @@ import { useSLS } from './composables/useSLS'
 import { useOSS } from './composables/useOSS'
 import { useVPC } from './composables/useVPC'
 import { useSLB } from './composables/useSLB'
+import { useConfig } from './composables/useConfig'
 import EcsResultTable from './components/EcsResultTable.vue'
 import InstanceDetailModal from './components/InstanceDetailModal.vue'
 import ConfirmDialog from './components/ConfirmDialog.vue'
@@ -22,6 +23,7 @@ const sls = useSLS(ecs.accessKeyId, ecs.accessKeySecret)
 const oss = useOSS(ecs.accessKeyId, ecs.accessKeySecret)
 const vpc = useVPC(ecs.accessKeyId, ecs.accessKeySecret)
 const slb = useSLB(ecs.accessKeyId, ecs.accessKeySecret)
+const cfg = useConfig()
 
 const activeTab = ref('ecs')
 const theme = ref('auto')
@@ -41,11 +43,35 @@ function toggleTheme() {
   applyTheme(theme.value)
 }
 
-onMounted(() => {
+async function handleProfileSwitch(name) {
+  await cfg.switchProfile(name)
+  const creds = await cfg.getProfileCredentials(name)
+  if (creds) {
+    ecs.accessKeyId.value = creds.accessKeyId || ''
+    ecs.accessKeySecret.value = creds.accessKeySecret || ''
+    if (creds.region) {
+      ecs.region.value = creds.region
+    }
+  }
+}
+
+onMounted(async () => {
   applyTheme(theme.value)
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
     if (theme.value === 'auto') applyTheme('auto')
   })
+  await cfg.loadProfiles()
+  // Auto-fill credentials from config if no env vars
+  if (cfg.currentProfile.value) {
+    const creds = await cfg.getProfileCredentials(cfg.currentProfile.value)
+    if (creds && !ecs.accessKeyId.value) {
+      ecs.accessKeyId.value = creds.accessKeyId || ''
+      ecs.accessKeySecret.value = creds.accessKeySecret || ''
+      if (creds.region) {
+        ecs.region.value = creds.region
+      }
+    }
+  }
 })
 
 const envOptions = [
@@ -90,6 +116,11 @@ function toggleRegion(regionValue) {
     <header class="app-header">
       <h1>Cloud 管理小助手</h1>
       <span class="version">v0.2.0</span>
+      <div v-if="cfg.profiles.value.length > 0" class="profile-selector">
+        <select v-model="cfg.currentProfile.value" @change="handleProfileSwitch($event.target.value)" class="profile-select">
+          <option v-for="p in cfg.profiles.value" :key="p" :value="p">{{ p }}</option>
+        </select>
+      </div>
       <button class="theme-toggle" @click="toggleTheme" :title="theme === 'auto' ? '跟随系统' : theme === 'dark' ? '暗色' : '浅色'">
         {{ theme === 'auto' ? '🖥️' : theme === 'dark' ? '🌙' : '☀️' }}
       </button>

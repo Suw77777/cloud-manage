@@ -77,6 +77,26 @@ body {
   background: rgba(255, 255, 255, 0.3);
 }
 
+.profile-selector {
+  margin-left: auto;
+}
+
+.profile-select {
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 6px;
+  padding: 6px 12px;
+  color: white;
+  font-size: 13px;
+  cursor: pointer;
+  outline: none;
+}
+
+.profile-select option {
+  background: #333;
+  color: white;
+}
+
 .app-header h1 {
   font-size: 20px;
   font-weight: 600;
