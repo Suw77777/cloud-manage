@@ -29,6 +29,7 @@ var (
 	accessKeyId     string
 	accessKeySecret string
 	region          string
+	profileName     string
 	outputJSON      bool
 	forceGUI        bool
 	forceCLI        bool
@@ -39,6 +40,7 @@ func init() {
 	flag.StringVar(&accessKeyId, "id", "", "AccessKey ID (or env CLOUD_ACCESS_KEY_ID)")
 	flag.StringVar(&accessKeySecret, "secret", "", "AccessKey Secret (or env CLOUD_ACCESS_KEY_SECRET)")
 	flag.StringVar(&region, "region", "cn-hangzhou", "Region ID (default: cn-hangzhou)")
+	flag.StringVar(&profileName, "profile", "", "Use specified profile (overrides current_profile)")
 	flag.BoolVar(&outputJSON, "json", false, "Output in JSON format")
 	flag.BoolVar(&forceGUI, "gui", false, "Force GUI mode (requires display)")
 	flag.BoolVar(&forceCLI, "cli", false, "Force CLI mode")
@@ -168,7 +170,7 @@ func runTUI() {
 	}
 }
 
-// loadCredentials loads credentials with priority: command line > env > config file > default
+// loadCredentials loads credentials with priority: command line > env > --profile > current_profile > default
 func loadCredentials() {
 	// Priority 1: Command line flags (already set)
 	// Priority 2: Environment variables
@@ -176,15 +178,35 @@ func loadCredentials() {
 	envSK := os.Getenv("CLOUD_ACCESS_KEY_SECRET")
 	envRegion := os.Getenv("CLOUD_REGION")
 
-	// Priority 3: Config file
+	// Priority 3: --profile or current_profile from config file
 	var cfgAK, cfgSK, cfgRegion string
 	if config.HasConfig() {
 		cfg, err := config.Load()
-		if err == nil && cfg.CurrentProfile != "" {
-			if profile, ok := cfg.Profiles[cfg.CurrentProfile]; ok {
-				cfgAK = profile.AccessKeyID
-				cfgSK = profile.AccessKeySecret
-				cfgRegion = profile.Region
+		if err == nil {
+			// Determine which profile to use
+			targetProfile := profileName // --profile flag
+			if targetProfile == "" {
+				targetProfile = cfg.CurrentProfile // current_profile from config
+			}
+
+			if targetProfile != "" {
+				if profile, ok := cfg.Profiles[targetProfile]; ok {
+					cfgAK = profile.AccessKeyID
+					cfgSK = profile.AccessKeySecret
+					cfgRegion = profile.Region
+
+					// If secret is encrypted, try to decrypt it
+					if config.IsEncrypted(cfgSK) {
+						decrypted, err := config.GetProfileWithCredentials(targetProfile)
+						if err != nil {
+							fmt.Fprintf(os.Stderr, "警告: 无法解密 profile '%s' 的凭证: %v\n", targetProfile, err)
+						} else {
+							cfgSK = decrypted.AccessKeySecret
+						}
+					}
+				} else if profileName != "" {
+					fmt.Fprintf(os.Stderr, "警告: profile '%s' 不存在\n", profileName)
+				}
 			}
 		}
 	}
