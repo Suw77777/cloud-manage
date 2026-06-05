@@ -1,11 +1,15 @@
 package config
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
+	"syscall"
 
+	"golang.org/x/term"
 	"gopkg.in/yaml.v3"
 )
 
@@ -15,13 +19,15 @@ const (
 	// ConfigFile is the configuration file name.
 	ConfigFile = "config.yaml"
 	// CurrentVersion is the current config file version.
-	CurrentVersion = 1
+	CurrentVersion = 2
 )
 
 // Config represents the application configuration.
 type Config struct {
 	// Version is the config file version for migration.
 	Version int `yaml:"version"`
+	// SaveCredentials indicates whether to save credentials to config file.
+	SaveCredentials bool `yaml:"save_credentials"`
 	// CurrentProfile is the name of the active profile.
 	CurrentProfile string `yaml:"current_profile"`
 	// Theme is the UI theme (light, dark, auto).
@@ -48,7 +54,7 @@ type PasswordPolicy struct {
 // Profile represents a cloud account profile.
 type Profile struct {
 	AccessKeyID     string `yaml:"access_key_id"`
-	AccessKeySecret string `yaml:"access_key_secret"`
+	AccessKeySecret string `yaml:"access_key_secret,omitempty"`
 	Region          string `yaml:"region"`
 	Endpoint        string `yaml:"endpoint,omitempty"`
 }
@@ -58,7 +64,9 @@ var (
 	globalConfig *Config
 	// configPath is the path to the configuration file.
 	configPath string
-	// mu protects globalConfig and configPath.
+	// masterPassword is the cached master password (for GUI/TUI session).
+	masterPassword string
+	// mu protects globalConfig, configPath, and masterPassword.
 	mu sync.RWMutex
 )
 
@@ -93,6 +101,91 @@ func SetConfigPath(path string) {
 	defer mu.Unlock()
 	configPath = path
 	globalConfig = nil
+}
+
+// SetMasterPassword sets the master password for the current session.
+func SetMasterPassword(password string) {
+	mu.Lock()
+	defer mu.Unlock()
+	masterPassword = password
+}
+
+// GetMasterPassword returns the cached master password.
+func GetMasterPassword() string {
+	mu.RLock()
+	defer mu.RUnlock()
+	return masterPassword
+}
+
+// ClearMasterPassword clears the cached master password.
+func ClearMasterPassword() {
+	mu.Lock()
+	defer mu.Unlock()
+	masterPassword = ""
+}
+
+// PromptMasterPassword prompts the user to enter the master password.
+func PromptMasterPassword(prompt string) (string, error) {
+	// Check environment variable first
+	if envPassword := os.Getenv("CLOUD_MASTER_PASSWORD"); envPassword != "" {
+		return envPassword, nil
+	}
+
+	// Check cached password
+	if cached := GetMasterPassword(); cached != "" {
+		return cached, nil
+	}
+
+	// Prompt for password
+	fmt.Print(prompt)
+
+	// Try to read password without echo
+	password, err := term.ReadPassword(int(syscall.Stdin))
+	if err != nil {
+		// Fallback to regular input
+		reader := bufio.NewReader(os.Stdin)
+		passwordStr, err := reader.ReadString('\n')
+		if err != nil {
+			return "", fmt.Errorf("failed to read password: %w", err)
+		}
+		password = []byte(strings.TrimSpace(passwordStr))
+	} else {
+		fmt.Println() // New line after password input
+	}
+
+	passwordStr := string(password)
+	if passwordStr == "" {
+		return "", fmt.Errorf("password cannot be empty")
+	}
+
+	return passwordStr, nil
+}
+
+// PromptNewPassword prompts the user to set a new master password.
+func PromptNewPassword() (string, error) {
+	password, err := PromptMasterPassword("请输入主密码: ")
+	if err != nil {
+		return "", err
+	}
+
+	// Validate password
+	cfg, _ := Load()
+	if cfg != nil {
+		if err := ValidatePassword(password, cfg.PasswordPolicy); err != nil {
+			return "", err
+		}
+	}
+
+	confirm, err := PromptMasterPassword("确认主密码: ")
+	if err != nil {
+		return "", err
+	}
+
+	if password != confirm {
+		return "", fmt.Errorf("两次输入的密码不一致")
+	}
+
+	return password, nil
 }
 
 // Load loads the configuration from the file.
@@ -190,11 +283,12 @@ func Save(cfg *Config) error {
 // DefaultConfig returns a default configuration.
 func DefaultConfig() *Config {
 	return &Config{
-		Version:        CurrentVersion,
-		CurrentProfile: "",
-		Theme:          "auto",
-		MemoryLimit:    256,
-		Concurrency:    3,
+		Version:         CurrentVersion,
+		SaveCredentials: false,
+		CurrentProfile:  "",
+		Theme:           "auto",
+		MemoryLimit:     256,
+		Concurrency:     3,
 		PasswordPolicy: PasswordPolicy{
 			MinLength:        8,
 			RequireUppercase: true,
@@ -211,14 +305,12 @@ func DemoConfig() *Config {
 	cfg := DefaultConfig()
 	cfg.CurrentProfile = "prod"
 	cfg.Profiles["prod"] = &Profile{
-		AccessKeyID:     "LTAI4xxx",
-		AccessKeySecret: "encrypted:xxxx",
-		Region:          "cn-hangzhou",
+		AccessKeyID: "LTAI4xxx",
+		Region:      "cn-hangzhou",
 	}
 	cfg.Profiles["dev"] = &Profile{
-		AccessKeyID:     "LTAI4xxx",
-		AccessKeySecret: "encrypted:xxxx",
-		Region:          "cn-shanghai",
+		AccessKeyID: "LTAI4xxx",
+		Region:      "cn-shanghai",
 	}
 	return cfg
 }
@@ -229,7 +321,12 @@ func generateDemoYAML() []byte {
 # 文档: https://github.com/anthropics/cloud-manage#配置说明
 
 # 配置文件版本（自动迁移，请勿手动修改）
-version: 1
+version: 2
+
+# 是否保存凭证到配置文件
+# true: 保存加密的 AccessKey Secret（需要设置主密码）
+# false: 只保存 AccessKey ID 和 Region（推荐）
+save_credentials: false
 
 # 当前使用的账号 profile
 # 可选值: prod, dev, test 等（对应下方 profiles 中的 key）
@@ -269,8 +366,8 @@ profiles:
   prod:
     # 阿里云 AccessKey ID
     access_key_id: "LTAI4xxx"
-    # 阿里云 AccessKey Secret (加密存储)
-    access_key_secret: "encrypted:xxxx"
+    # 阿里云 AccessKey Secret (仅 save_credentials: true 时保存)
+    # access_key_secret: "encrypted:xxxx"
     # 默认区域
     # 可选值: cn-hangzhou, cn-shanghai, cn-beijing, cn-shenzhen 等
     region: "cn-hangzhou"
@@ -281,13 +378,11 @@ profiles:
   # 开发环境账号
   dev:
     access_key_id: "LTAI4xxx"
-    access_key_secret: "encrypted:xxxx"
     region: "cn-shanghai"
 
   # 测试环境账号
   test:
     access_key_id: "LTAI4xxx"
-    access_key_secret: "encrypted:xxxx"
     region: "cn-beijing"
 `)
 }
@@ -321,7 +416,17 @@ func InitConfig(force bool) error {
 
 // migrate migrates the configuration to the current version.
 func migrate(cfg *Config) error {
-	// Future migrations go here
+	// Migration from v1 to v2: add save_credentials field
+	if cfg.Version < 2 {
+		// If profiles have secrets, assume save_credentials was true
+		for _, profile := range cfg.Profiles {
+			if profile.AccessKeySecret != "" {
+				cfg.SaveCredentials = true
+				break
+			}
+		}
+	}
+
 	cfg.Version = CurrentVersion
 	return nil
 }
@@ -359,6 +464,25 @@ func HasConfig() bool {
 	return err == nil
 }
 
+// HasSavedCredentials checks if any profile has saved credentials.
+func HasSavedCredentials() bool {
+	cfg, err := Load()
+	if err != nil {
+		return false
+	}
+
+	if !cfg.SaveCredentials {
+		return false
+	}
+
+	for _, profile := range cfg.Profiles {
+		if profile.AccessKeySecret != "" {
+			return true
+		}
+	}
+	return false
+}
+
 // GetProfile returns the current profile.
 func GetProfile() (*Profile, error) {
 	cfg, err := Load()
@@ -394,7 +518,8 @@ func GetProfileByName(name string) (*Profile, error) {
 }
 
 // AddProfile adds or updates a profile.
-func AddProfile(name string, profile *Profile) error {
+// If saveCredentials is true, the secret will be encrypted and saved.
+func AddProfile(name string, profile *Profile, saveCredentials bool) error {
 	cfg, err := Load()
 	if err != nil {
 		return err
@@ -402,6 +527,30 @@ func AddProfile(name string, profile *Profile) error {
 
 	if cfg.Profiles == nil {
 		cfg.Profiles = make(map[string]*Profile)
+	}
+
+	// If saveCredentials is true, encrypt the secret
+	if saveCredentials && profile.AccessKeySecret != "" {
+		// Prompt for master password
+		password, err := PromptNewPassword()
+		if err != nil {
+			return fmt.Errorf("设置主密码失败: %w", err)
+		}
+
+		// Encrypt the secret
+		encrypted, err := Encrypt(profile.AccessKeySecret, password)
+		if err != nil {
+			return fmt.Errorf("加密失败: %w", err)
+		}
+
+		profile.AccessKeySecret = encrypted
+		cfg.SaveCredentials = true
+
+		// Cache the password for current session
+		SetMasterPassword(password)
+	} else {
+		// Don't save secret
+		profile.AccessKeySecret = ""
 	}
 
 	cfg.Profiles[name] = profile
@@ -468,6 +617,38 @@ func ListProfiles() []string {
 	return names
 }
 
+// GetProfileWithCredentials returns a profile with decrypted credentials.
+// This will prompt for the master password if needed.
+func GetProfileWithCredentials(name string) (*Profile, error) {
+	profile, err := GetProfileByName(name)
+	if err != nil {
+		return nil, err
+	}
+
+	// If secret is encrypted, decrypt it
+	if IsEncrypted(profile.AccessKeySecret) {
+		password, err := PromptMasterPassword("请输入主密码解锁配置: ")
+		if err != nil {
+			return nil, fmt.Errorf("获取主密码失败: %w", err)
+		}
+
+		decrypted, err := Decrypt(profile.AccessKeySecret, password)
+		if err != nil {
+			return nil, fmt.Errorf("解密失败（密码错误？）: %w", err)
+		}
+
+		// Cache the password for current session
+		SetMasterPassword(password)
+
+		// Return a copy with decrypted secret
+		decryptedProfile := *profile
+		decryptedProfile.AccessKeySecret = decrypted
+		return &decryptedProfile, nil
+	}
+
+	return profile, nil
+}
+
 // ResetConfig deletes the configuration file.
 func ResetConfig() error {
 	path, err := GetConfigPath()
@@ -481,7 +662,24 @@ func ResetConfig() error {
 
 	mu.Lock()
 	globalConfig = nil
+	masterPassword = ""
 	mu.Unlock()
 
 	return nil
+}
+
+// UpdateTheme updates the theme in the config file.
+func UpdateTheme(theme string) error {
+	cfg, err := Load()
+	if err != nil {
+		return err
+	}
+
+	validThemes := map[string]bool{"light": true, "dark": true, "auto": true}
+	if !validThemes[theme] {
+		return fmt.Errorf("invalid theme: %s", theme)
+	}
+
+	cfg.Theme = theme
+	return Save(cfg)
 }

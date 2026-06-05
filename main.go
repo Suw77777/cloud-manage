@@ -1186,8 +1186,21 @@ func handleConfigInit(args []string) {
 }
 
 func handleConfigAdd(args []string) {
+	// Parse --save flag
+	saveCredentials := false
+	filteredArgs := []string{}
+	for _, arg := range args {
+		if arg == "--save" {
+			saveCredentials = true
+		} else {
+			filteredArgs = append(filteredArgs, arg)
+		}
+	}
+	args = filteredArgs
+
 	if len(args) < 1 {
-		fmt.Fprintf(os.Stderr, "Usage: cloud-manage config add <profile>\n")
+		fmt.Fprintf(os.Stderr, "Usage: cloud-manage config add <profile> [--save]\n")
+		fmt.Fprintf(os.Stderr, "  --save  保存加密的 AccessKey Secret 到配置文件\n")
 		os.Exit(1)
 	}
 
@@ -1213,9 +1226,9 @@ func handleConfigAdd(args []string) {
 	}
 	profileRegion := region
 
-	if akId == "" || akSecret == "" {
-		fmt.Fprintf(os.Stderr, "Error: AccessKey ID and Secret are required.\n")
-		fmt.Fprintf(os.Stderr, "Use -id/-secret flags or set CLOUD_ACCESS_KEY_ID/CLOUD_ACCESS_KEY_SECRET environment variables.\n")
+	if akId == "" {
+		fmt.Fprintf(os.Stderr, "Error: AccessKey ID is required.\n")
+		fmt.Fprintf(os.Stderr, "Use -id flag or set CLOUD_ACCESS_KEY_ID environment variable.\n")
 		os.Exit(1)
 	}
 
@@ -1227,12 +1240,16 @@ func handleConfigAdd(args []string) {
 	}
 
 	// Add profile
-	if err := config.AddProfile(profileName, profile); err != nil {
+	if err := config.AddProfile(profileName, profile, saveCredentials); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
 
-	fmt.Printf("账号 '%s' 已添加。\n", profileName)
+	if saveCredentials {
+		fmt.Printf("账号 '%s' 已添加（凭证已加密保存）。\n", profileName)
+	} else {
+		fmt.Printf("账号 '%s' 已添加（仅保存 AccessKey ID 和 Region）。\n", profileName)
+	}
 }
 
 func handleConfigRemove(args []string) {
