@@ -7,6 +7,7 @@ import { useOSS } from './composables/useOSS'
 import { useVPC } from './composables/useVPC'
 import { useSLB } from './composables/useSLB'
 import { useConfig } from './composables/useConfig'
+import { GetTheme, SetTheme } from '../wailsjs/go/main/App'
 import EcsResultTable from './components/EcsResultTable.vue'
 import InstanceDetailModal from './components/InstanceDetailModal.vue'
 import ConfirmDialog from './components/ConfirmDialog.vue'
@@ -36,11 +37,17 @@ function applyTheme(t) {
   }
 }
 
-function toggleTheme() {
+async function toggleTheme() {
   const themes = ['auto', 'light', 'dark']
   const idx = themes.indexOf(theme.value)
   theme.value = themes[(idx + 1) % themes.length]
   applyTheme(theme.value)
+  // Save to config
+  try {
+    await SetTheme(theme.value)
+  } catch (e) {
+    console.error('Failed to save theme:', e)
+  }
 }
 
 async function handleProfileSwitch(name) {
@@ -56,7 +63,17 @@ async function handleProfileSwitch(name) {
 }
 
 onMounted(async () => {
+  // Load theme from config
+  try {
+    const savedTheme = await GetTheme()
+    if (savedTheme) {
+      theme.value = savedTheme
+    }
+  } catch (e) {
+    console.error('Failed to load theme:', e)
+  }
   applyTheme(theme.value)
+
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
     if (theme.value === 'auto') applyTheme('auto')
   })

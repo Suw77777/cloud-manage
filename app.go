@@ -1022,3 +1022,20 @@ func (a *App) ExportSLSLogs(accessKeyId, accessKeySecret, region, project, logst
 
 	return *result, nil
 }
+
+// GetTheme returns the current theme from config.
+func (a *App) GetTheme() string {
+	cfg, err := config.Load()
+	if err != nil {
+		return "auto"
+	}
+	if cfg.Theme == "" {
+		return "auto"
+	}
+	return cfg.Theme
+}
+
+// SetTheme saves the theme to config.
+func (a *App) SetTheme(theme string) error {
+	return config.UpdateTheme(theme)
+}

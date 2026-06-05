@@ -109,3 +109,11 @@ export function GetProfileCredentials(arg1) {
 export function ExportSLSLogs(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10) {
   return window['go']['main']['App']['ExportSLSLogs'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10);
 }
+
+export function GetTheme() {
+  return window['go']['main']['App']['GetTheme']();
+}
+
+export function SetTheme(arg1) {
+  return window['go']['main']['App']['SetTheme'](arg1);
+}
