@@ -77,7 +77,7 @@ export CLOUD_ACCESS_KEY_SECRET=your-key-secret
 # 云监控（分步查询）
 ./cloud-manage cms products          # 列出支持的云产品
 ./cloud-manage cms metrics ecs       # 列出 ECS 实例
-./cloud-manage cms query i-xxx       # 查询实例监控数据
+./cloud-manage cms metrics i-xxx      # 查询实例监控数据
 
 # 日志服务
 ./cloud-manage sls logstores <project>
