@@ -9,11 +9,16 @@ import (
 func setupTestConfig(t *testing.T) string {
 	t.Helper()
 	tmpDir := t.TempDir()
-	configPath := filepath.Join(tmpDir, "config.yaml")
-	SetConfigPath(configPath)
-	// Clear master password for tests
+	path := filepath.Join(tmpDir, "config.yaml")
+	// Reset all global state
+	mu.Lock()
+	configPath = ""
+	globalConfig = nil
+	masterPassword = ""
+	mu.Unlock()
+	SetConfigPath(path)
 	ClearMasterPassword()
-	return configPath
+	return path
 }
 
 func TestDefaultConfig(t *testing.T) {

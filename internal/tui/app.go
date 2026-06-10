@@ -237,8 +237,6 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return a, tea.Batch(cmds...)
 	}
-
-	return a, tea.Batch(cmds...)
 }
 
 func (a *App) updateLogin(msg tea.KeyMsg) (tea.Model, tea.Cmd) {

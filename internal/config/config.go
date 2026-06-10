@@ -262,8 +262,8 @@ func Save(cfg *Config) error {
 		return saveWithComments(path, cfg)
 	}
 
-	// File doesn't exist, create new with demo YAML
-	return os.WriteFile(path, generateDemoYAML(), 0600)
+	// File doesn't exist, create new with actual config
+	return saveFull(path, cfg)
 }
 
 // saveWithComments updates the config file preserving comments.
