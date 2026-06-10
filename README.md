@@ -9,7 +9,24 @@
 - Go 1.21+
 - Node.js 18+
 - Wails CLI: `go install github.com/wailsapp/wails/v2/cmd/wails@latest`
-- Linux GUI 依赖: `libgtk-3-dev libwebkit2gtk-4.0-dev`
+- Linux GUI 依赖（仅 GUI 模式需要，TUI/CLI 无需安装）:
+
+```bash
+# 一键安装（自动检测发行版和 webkit 版本）
+./scripts/install-deps.sh
+
+# 或手动安装:
+# Ubuntu 22.04 / Linux Mint 21:
+sudo apt install libgtk-3-dev libwebkit2gtk-4.0-dev
+# Ubuntu 24.04 / Linux Mint 22+:
+sudo apt install libgtk-3-dev libwebkit2gtk-4.1-dev
+# Arch:
+sudo pacman -S gtk3 webkit2gtk
+# Fedora:
+sudo dnf install gtk3-devel webkit2gtk4.1-devel
+```
+
+> **不需要 GUI？** CLI 和 TUI 模式零系统依赖，直接 `go build -o cloud-manage .` 即可。
 
 ### 构建命令
 
