@@ -15,12 +15,12 @@ type VPCService struct {
 	providerFactory VPCProviderFactory
 }
 
-// NewVPCService 创建使用默认 Provider 工厂的 VPCService。
+// NewVPCService 创建使用默认 Provider 工厂的 VPCService（带缓存）。
 func NewVPCService() *VPCService {
 	return &VPCService{
-		providerFactory: func(accessKeyId, accessKeySecret, region string) (provider.VPCProvider, error) {
+		providerFactory: CachedFactory("vpc", func(accessKeyId, accessKeySecret, region string) (provider.VPCProvider, error) {
 			return aliyun.NewVPCProvider(accessKeyId, accessKeySecret, region)
-		},
+		}),
 	}
 }
 

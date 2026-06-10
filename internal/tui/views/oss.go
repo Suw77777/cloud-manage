@@ -17,6 +17,9 @@ type OSSView struct {
 	bucket     string
 	width      int
 	height     int
+	ak         string
+	sk         string
+	region     string
 }
 
 func NewOSSView() OSSView {
@@ -25,6 +28,12 @@ func NewOSSView() OSSView {
 		detail:  components.NewDetail("Bucket Detail"),
 		service: service.NewOSSService(),
 	}
+}
+
+func (v *OSSView) SetCredentials(ak, sk, region string) {
+	v.ak = ak
+	v.sk = sk
+	v.region = region
 }
 
 func (v *OSSView) SetSize(width, height int) {
@@ -105,13 +114,13 @@ func (v *OSSView) HandleKey(msg tea.KeyMsg) tea.Cmd {
 			row := v.table.SelectedRow()
 			if row != nil {
 				v.bucket = row[0]
-				return v.LoadObjects("", "", "", v.bucket)
+				return v.LoadObjects(v.ak, v.sk, v.region, v.bucket)
 			}
 		}
 	case "esc":
 		if v.showBucket {
 			v.showBucket = false
-			return v.LoadBuckets("", "", "")
+			return v.LoadBuckets(v.ak, v.sk, v.region)
 		}
 	}
 	return nil
@@ -122,6 +131,15 @@ func (v OSSView) Render() string {
 		return "Loading..."
 	}
 	return v.table.Render()
+}
+
+func (v *OSSView) HandleMessage(msg tea.Msg) tea.Cmd {
+	switch m := msg.(type) {
+	case tea.KeyMsg:
+		return v.HandleKey(m)
+	default:
+		return v.Update(msg)
+	}
 }
 
 func formatSize(bytes int64) string {

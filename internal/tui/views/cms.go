@@ -15,6 +15,9 @@ type CMSView struct {
 	service *service.CMSService
 	width   int
 	height  int
+	ak      string
+	sk      string
+	region  string
 }
 
 func NewCMSView() CMSView {
@@ -23,6 +26,12 @@ func NewCMSView() CMSView {
 		detail:  components.NewDetail("Metric Detail"),
 		service: service.NewCMSService(),
 	}
+}
+
+func (v *CMSView) SetCredentials(ak, sk, region string) {
+	v.ak = ak
+	v.sk = sk
+	v.region = region
 }
 
 func (v *CMSView) SetSize(width, height int) {
@@ -83,4 +92,13 @@ func (v CMSView) Render() string {
 		return "Loading..."
 	}
 	return v.table.Render()
+}
+
+func (v *CMSView) HandleMessage(msg tea.Msg) tea.Cmd {
+	switch m := msg.(type) {
+	case tea.KeyMsg:
+		return v.HandleKey(m)
+	default:
+		return v.Update(msg)
+	}
 }

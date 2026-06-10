@@ -1,9 +1,12 @@
 package views
 
 import (
-	tea "github.com/charmbracelet/bubbletea"
+	"cloud-manage/internal/consts"
 	"cloud-manage/internal/tui/components"
 	"cloud-manage/service"
+	"fmt"
+
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 type ECSView struct {
@@ -14,6 +17,9 @@ type ECSView struct {
 	service    *service.ECSService
 	width      int
 	height     int
+	ak         string
+	sk         string
+	region     string
 }
 
 func NewECSView() ECSView {
@@ -22,6 +28,12 @@ func NewECSView() ECSView {
 		detail:  components.NewDetail("Instance Detail"),
 		service: service.NewECSService(),
 	}
+}
+
+func (v *ECSView) SetCredentials(ak, sk, region string) {
+	v.ak = ak
+	v.sk = sk
+	v.region = region
 }
 
 func (v *ECSView) SetSize(width, height int) {
@@ -90,18 +102,39 @@ func (v *ECSView) HandleKey(msg tea.KeyMsg) tea.Cmd {
 	case "esc":
 		v.showDetail = false
 		v.detail.Clear()
+	case "R":
+		// Cycle to next region
+		regions := consts.AllRegions
+		for i, r := range regions {
+			if r.ID == v.region {
+				v.region = regions[(i+1)%len(regions)].ID
+				break
+			}
+		}
+		v.loading = true
+		return v.LoadData(v.ak, v.sk, v.region)
 	}
 	return nil
 }
 
 func (v ECSView) Render() string {
 	if v.loading {
-		return "Loading..."
+		return fmt.Sprintf("  Loading %s...", v.region)
 	}
 
 	if v.showDetail {
 		return v.detail.Render()
 	}
 
-	return v.table.Render()
+	return fmt.Sprintf("  Region: %s (R to switch)\n\n", v.region) + v.table.Render()
+}
+
+// HandleMessage routes messages to Update or HandleKey.
+func (v *ECSView) HandleMessage(msg tea.Msg) tea.Cmd {
+	switch m := msg.(type) {
+	case tea.KeyMsg:
+		return v.HandleKey(m)
+	default:
+		return v.Update(msg)
+	}
 }

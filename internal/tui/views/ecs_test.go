@@ -2,6 +2,7 @@ package views
 
 import (
 	"cloud-manage/service"
+	"strings"
 	"testing"
 )
 
@@ -69,10 +70,11 @@ func TestECSView_Update_Error(t *testing.T) {
 func TestECSView_Render_Loading(t *testing.T) {
 	view := NewECSView()
 	view.loading = true
+	view.region = "cn-hangzhou"
 
 	result := view.Render()
-	if result != "Loading..." {
-		t.Errorf("expected 'Loading...', got '%s'", result)
+	if !strings.Contains(result, "Loading") {
+		t.Errorf("expected 'Loading' in render, got '%s'", result)
 	}
 }
 

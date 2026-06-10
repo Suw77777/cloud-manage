@@ -281,23 +281,21 @@ func TestUpdateTheme(t *testing.T) {
 func TestMigration(t *testing.T) {
 	setupTestConfig(t)
 
-	// Create a v1 config with secret
-	cfg := &Config{
-		Version:     1,
-		MemoryLimit: 256,
-		Concurrency: 3,
-		Profiles: map[string]*Profile{
-			"prod": {
-				AccessKeyID:     "prod-id",
-				AccessKeySecret: "some-secret",
-				Region:          "cn-hangzhou",
-			},
-		},
-	}
-
-	// Save it
-	if err := Save(cfg); err != nil {
-		t.Fatalf("failed to save config: %v", err)
+	// Write a v1 config file directly (without save_credentials field)
+	v1Content := `version: 1
+current_profile: prod
+theme: auto
+memory_limit: 256
+concurrency: 3
+profiles:
+  prod:
+    access_key_id: "prod-id"
+    access_key_secret: "some-secret"
+    region: "cn-hangzhou"
+`
+	path, _ := GetConfigPath()
+	if err := os.WriteFile(path, []byte(v1Content), 0600); err != nil {
+		t.Fatalf("failed to write v1 config: %v", err)
 	}
 
 	// Reset cache

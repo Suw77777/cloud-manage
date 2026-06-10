@@ -19,12 +19,12 @@ type SLSService struct {
 	providerFactory SLSProviderFactory
 }
 
-// NewSLSService creates a new SLSService with default provider factory.
+// NewSLSService creates a new SLSService with default provider factory (cached).
 func NewSLSService() *SLSService {
 	return &SLSService{
-		providerFactory: func(accessKeyId, accessKeySecret, region string) (provider.SLSProvider, error) {
+		providerFactory: CachedFactory("sls", func(accessKeyId, accessKeySecret, region string) (provider.SLSProvider, error) {
 			return aliyun.NewSLSProvider(accessKeyId, accessKeySecret, region)
-		},
+		}),
 	}
 }
 

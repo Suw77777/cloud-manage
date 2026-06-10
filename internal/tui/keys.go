@@ -13,6 +13,8 @@ type KeyMap struct {
 	Help    key.Binding
 	Refresh key.Binding
 	Region  key.Binding
+	Theme   key.Binding
+	Profile key.Binding
 	Tab1    key.Binding
 	Tab2    key.Binding
 	Tab3    key.Binding
@@ -62,6 +64,14 @@ var Keys = KeyMap{
 	Region: key.NewBinding(
 		key.WithKeys("R"),
 		key.WithHelp("R", "change region"),
+	),
+	Theme: key.NewBinding(
+		key.WithKeys("t"),
+		key.WithHelp("t", "toggle theme"),
+	),
+	Profile: key.NewBinding(
+		key.WithKeys("p"),
+		key.WithHelp("p", "switch profile"),
 	),
 	Tab1: key.NewBinding(
 		key.WithKeys("1"),

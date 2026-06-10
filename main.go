@@ -1,19 +1,17 @@
 package main
 
 import (
+	"cloud-manage/internal/cli"
 	"cloud-manage/internal/config"
 	"cloud-manage/internal/consts"
 	"cloud-manage/internal/tui"
-	"cloud-manage/service"
 	"embed"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
 	"runtime/debug"
 	"sort"
 	"strconv"
-	"strings"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -47,31 +45,19 @@ func init() {
 	flag.BoolVar(&forceTUI, "tui", false, "Force TUI mode (terminal UI)")
 }
 
-// knownServices are the valid CLI subcommands.
 var knownServices = map[string]bool{
-	"ecs":     true,
-	"cms":     true,
-	"sls":     true,
-	"oss":     true,
-	"vpc":     true,
-	"slb":     true,
-	"config":  true,
-	"help":    true,
-	"version": true,
+	"ecs": true, "cms": true, "sls": true, "oss": true,
+	"vpc": true, "slb": true, "config": true, "help": true, "version": true,
 }
 
 func main() {
 	flag.Usage = printUsage
 	flag.Parse()
-
-	// Set memory limit
 	setMemoryLimit()
 
 	fmt.Printf("\n  Cloud 管理小助手 %s\n\n", consts.Version)
 
-	mode := detectMode()
-
-	switch mode {
+	switch detectMode() {
 	case "gui":
 		runGUI()
 	case "tui":
@@ -83,34 +69,22 @@ func main() {
 
 // setMemoryLimit sets the memory limit from config, env var, or default.
 func setMemoryLimit() {
-	defaultLimit := 256 // MB
-
-	// Priority: env var > config file > default
-	limitMB := defaultLimit
-
-	// Check config file
+	limitMB := 256
 	if config.HasConfig() {
-		cfg, err := config.Load()
-		if err == nil && cfg.MemoryLimit > 0 {
+		if cfg, err := config.Load(); err == nil && cfg.MemoryLimit > 0 {
 			limitMB = cfg.MemoryLimit
 		}
 	}
-
-	// Check env var (overrides config)
 	if envLimit := os.Getenv("CLOUD_MEMORY_LIMIT"); envLimit != "" {
 		if parsed, err := strconv.Atoi(envLimit); err == nil && parsed > 0 {
 			limitMB = parsed
 		}
 	}
-
-	// Set memory limit
-	limitBytes := int64(limitMB) * 1024 * 1024
-	debug.SetMemoryLimit(limitBytes)
+	debug.SetMemoryLimit(int64(limitMB) * 1024 * 1024)
 }
 
 // detectMode determines whether to run in GUI, TUI, or CLI mode.
 func detectMode() string {
-	// 1. Explicit flags take priority
 	if forceGUI {
 		return "gui"
 	}
@@ -120,48 +94,33 @@ func detectMode() string {
 	if forceCLI {
 		return "cli"
 	}
-
-	// 2. If subcommand is present, use CLI mode
 	args := flag.Args()
 	if len(args) > 0 && knownServices[args[0]] {
 		return "cli"
 	}
-
-	// 3. Check for graphical environment
 	if os.Getenv("DISPLAY") != "" || os.Getenv("WAYLAND_DISPLAY") != "" || os.Getenv("WAYLAND_SOCKET") != "" {
 		return "gui"
 	}
-
-	// 4. No display found, default to TUI
 	return "tui"
 }
 
-// runGUI starts the Wails desktop application.
 func runGUI() {
 	fmt.Println("  检测到图形环境，启动 GUI 模式...")
 	fmt.Println()
-
 	app := NewApp()
-
-	err := wails.Run(&options.App{
+	if err := wails.Run(&options.App{
 		Title:  "Cloud 管理小助手",
 		Width:  1200,
 		Height: 800,
-		AssetServer: &assetserver.Options{
-			Assets: assets,
-		},
-		OnStartup: app.startup,
-		Bind: []interface{}{
-			app,
-		},
-	})
-	if err != nil {
+		AssetServer: &assetserver.Options{Assets: assets},
+		OnStartup:   app.startup,
+		Bind:        []interface{}{app},
+	}); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
 }
 
-// runTUI starts the terminal UI application.
 func runTUI() {
 	p := tea.NewProgram(tui.NewApp(), tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
@@ -170,35 +129,26 @@ func runTUI() {
 	}
 }
 
-// loadCredentials loads credentials with priority: command line > env > --profile > current_profile > default
+// loadCredentials loads credentials with priority: command line > env > --profile > current_profile > default.
 func loadCredentials() {
-	// Priority 1: Command line flags (already set)
-	// Priority 2: Environment variables
 	envAK := os.Getenv("CLOUD_ACCESS_KEY_ID")
 	envSK := os.Getenv("CLOUD_ACCESS_KEY_SECRET")
 	envRegion := os.Getenv("CLOUD_REGION")
 
-	// Priority 3: --profile or current_profile from config file
 	var cfgAK, cfgSK, cfgRegion string
 	if config.HasConfig() {
-		cfg, err := config.Load()
-		if err == nil {
-			// Determine which profile to use
-			targetProfile := profileName // --profile flag
+		if cfg, err := config.Load(); err == nil {
+			targetProfile := profileName
 			if targetProfile == "" {
-				targetProfile = cfg.CurrentProfile // current_profile from config
+				targetProfile = cfg.CurrentProfile
 			}
-
 			if targetProfile != "" {
 				if profile, ok := cfg.Profiles[targetProfile]; ok {
 					cfgAK = profile.AccessKeyID
 					cfgSK = profile.AccessKeySecret
 					cfgRegion = profile.Region
-
-					// If secret is encrypted, try to decrypt it
 					if config.IsEncrypted(cfgSK) {
-						decrypted, err := config.GetProfileWithCredentials(targetProfile)
-						if err != nil {
+						if decrypted, err := config.GetProfileWithCredentials(targetProfile); err != nil {
 							fmt.Fprintf(os.Stderr, "警告: 无法解密 profile '%s' 的凭证: %v\n", targetProfile, err)
 						} else {
 							cfgSK = decrypted.AccessKeySecret
@@ -211,95 +161,66 @@ func loadCredentials() {
 		}
 	}
 
-	// Apply priority and warn on conflicts
+	// Apply priority: CLI flag > env > config
 	if accessKeyId == "" {
 		if envAK != "" {
 			accessKeyId = envAK
-			if cfgAK != "" && envAK != cfgAK {
-				fmt.Fprintf(os.Stderr, "警告: 使用环境变量 CLOUD_ACCESS_KEY_ID，与配置文件不一致\n")
-			}
 		} else if cfgAK != "" {
 			accessKeyId = cfgAK
 		}
-	} else {
-		if envAK != "" && accessKeyId != envAK {
-			fmt.Fprintf(os.Stderr, "警告: 使用命令行参数 -id，与环境变量不一致\n")
-		}
-		if cfgAK != "" && accessKeyId != cfgAK {
-			fmt.Fprintf(os.Stderr, "警告: 使用命令行参数 -id，与配置文件不一致\n")
-		}
 	}
-
 	if accessKeySecret == "" {
 		if envSK != "" {
 			accessKeySecret = envSK
-			if cfgSK != "" && envSK != cfgSK {
-				fmt.Fprintf(os.Stderr, "警告: 使用环境变量 CLOUD_ACCESS_KEY_SECRET，与配置文件不一致\n")
-			}
 		} else if cfgSK != "" {
 			accessKeySecret = cfgSK
 		}
-	} else {
-		if envSK != "" && accessKeySecret != envSK {
-			fmt.Fprintf(os.Stderr, "警告: 使用命令行参数 -secret，与环境变量不一致\n")
-		}
-		if cfgSK != "" && accessKeySecret != cfgSK {
-			fmt.Fprintf(os.Stderr, "警告: 使用命令行参数 -secret，与配置文件不一致\n")
-		}
 	}
-
-	// Handle region with default
 	defaultRegion := "cn-hangzhou"
 	if region == defaultRegion {
-		// User didn't set -region flag
 		if envRegion != "" {
 			region = envRegion
-			if cfgRegion != "" && envRegion != cfgRegion {
-				fmt.Fprintf(os.Stderr, "警告: 使用环境变量 CLOUD_REGION，与配置文件不一致\n")
-			}
 		} else if cfgRegion != "" {
 			region = cfgRegion
-		}
-	} else {
-		// User set -region flag
-		if envRegion != "" && region != envRegion {
-			fmt.Fprintf(os.Stderr, "警告: 使用命令行参数 -region，与环境变量不一致\n")
-		}
-		if cfgRegion != "" && region != cfgRegion {
-			fmt.Fprintf(os.Stderr, "警告: 使用命令行参数 -region，与配置文件不一致\n")
 		}
 	}
 }
 
-// runCLI processes command-line operations.
-func runCLI() {
-	// Load credentials with priority handling
-	loadCredentials()
+func getConcurrency() int {
+	concurrency := 3
+	if config.HasConfig() {
+		if cfg, err := config.Load(); err == nil && cfg.Concurrency > 0 {
+			concurrency = cfg.Concurrency
+		}
+	}
+	if envConcurrency := os.Getenv("CLOUD_CONCURRENCY"); envConcurrency != "" {
+		if parsed, err := strconv.Atoi(envConcurrency); err == nil && parsed > 0 {
+			concurrency = parsed
+		}
+	}
+	return concurrency
+}
 
+func runCLI() {
+	loadCredentials()
 	args := flag.Args()
 	if len(args) == 0 {
 		printUsage()
 		os.Exit(1)
 	}
 
-	serviceName := args[0]
-	action := ""
+	serviceName, action := args[0], ""
 	if len(args) > 1 {
 		action = args[1]
 	}
+	remainingArgs := args[2:]
 
-	// Validate credentials (not needed for help display or product listing)
 	needsCredentials := action != "" && !(serviceName == "cms" && action == "products") && serviceName != "config"
 	if needsCredentials && (accessKeyId == "" || accessKeySecret == "") {
 		fmt.Fprintf(os.Stderr, "Error: AccessKey ID and Secret are required.\n")
 		fmt.Fprintf(os.Stderr, "Use -id/-secret flags, set CLOUD_ACCESS_KEY_ID/CLOUD_ACCESS_KEY_SECRET environment variables,\n")
 		fmt.Fprintf(os.Stderr, "or use 'cloud-manage config add <profile>' to configure credentials.\n")
 		os.Exit(1)
-	}
-
-	remainingArgs := []string{}
-	if len(args) > 2 {
-		remainingArgs = args[2:]
 	}
 
 	switch serviceName {
@@ -328,133 +249,38 @@ func runCLI() {
 	}
 }
 
-func printUsage() {
-	fmt.Println(`Usage:
-  cloud-manage [flags] <service> <action> [args...]
-
-Modes:
-  --gui             Force GUI mode (requires display)
-  --tui             Force TUI mode (terminal UI)
-  --cli             Force CLI mode
-  (auto)            Auto-detect based on display environment
-
-Services:
-  ecs               ECS 实例管理
-  cms               云监控指标查询
-  sls               日志服务查询
-  oss               对象存储管理
-  vpc               VPC 网络管理
-  slb               负载均衡管理
-
-Commands:
-  help              显示帮助信息
-  version           显示版本号
-
-Flags:`)
-	flag.PrintDefaults()
-	fmt.Println(`
-Examples:
-  # Auto-detect mode (TUI if no display, GUI if display available)
-  cloud-manage
-
-  # Force TUI mode
-  cloud-manage --tui
-
-  # Force GUI mode
-  cloud-manage --gui
-
-  # CLI: List ECS instances
-  cloud-manage -id LTAI4xxx -secret xxx ecs list
-
-  # CLI: View ECS instance detail
-  cloud-manage ecs detail i-xxx
-
-  # CLI: Start ECS instance
-  cloud-manage ecs start i-xxx
-
-  # CLI: Query monitoring metrics
-  cloud-manage cms metrics i-xxx
-
-  # CLI: List OSS buckets
-  cloud-manage oss buckets
-
-  # CLI: List OSS objects
-  cloud-manage oss objects my-bucket --prefix logs/
-
-  # CLI: Query SLS logs
-  cloud-manage sls logs my-project my-logstore --query "level: ERROR"
-
-  # CLI: List VPCs
-  cloud-manage vpc list
-
-  # CLI: List VSwitches in a VPC
-  cloud-manage vpc vswitches vpc-xxx
-
-  # CLI: List SLBs
-  cloud-manage slb list
-
-Environment Variables:
-  CLOUD_ACCESS_KEY_ID      AccessKey ID
-  CLOUD_ACCESS_KEY_SECRET  AccessKey Secret`)
-}
-
 // ========== ECS ==========
 
-func getConcurrency() int {
-	defaultConcurrency := 3
-
-	// Priority: env var > config file > default
-	concurrency := defaultConcurrency
-
-	// Check config file
-	if config.HasConfig() {
-		cfg, err := config.Load()
-		if err == nil && cfg.Concurrency > 0 {
-			concurrency = cfg.Concurrency
-		}
-	}
-
-	// Check env var (overrides config)
-	if envConcurrency := os.Getenv("CLOUD_CONCURRENCY"); envConcurrency != "" {
-		if parsed, err := strconv.Atoi(envConcurrency); err == nil && parsed > 0 {
-			concurrency = parsed
-		}
-	}
-
-	return concurrency
-}
-
 func handleECS(action string, args []string) {
-	svc := service.NewECSService()
+	h := cli.NewECSHandler()
 
 	switch action {
 	case "list":
 		regions := []string{region}
 		if region == "all" {
-			regions = getAllRegions()
+			regions = consts.RegionIDs()
 		}
 		if len(regions) == 1 {
-			result, err := svc.ListInstances(accessKeyId, accessKeySecret, regions[0])
+			result, err := h.ListInstances(accessKeyId, accessKeySecret, regions[0])
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 				os.Exit(1)
 			}
 			if outputJSON {
-				printJSON(result)
+				cli.PrintJSON(result)
 			} else {
-				printInstances(result.Instances, regions[0])
+				cli.PrintInstances(result.Instances, regions[0])
 			}
 		} else {
-			concurrency := getConcurrency()
-			results := svc.ListInstancesMultiRegionWithConcurrency(accessKeyId, accessKeySecret, regions, concurrency)
+			results := h.ListInstancesMultiRegion(accessKeyId, accessKeySecret, regions, getConcurrency())
 			if outputJSON {
-				printJSON(results)
+				cli.PrintJSON(results)
 			} else {
 				for _, r := range results {
 					if r.Error != "" {
 						fmt.Printf("\n[%s] Error: %s\n", r.Region, r.Error)
 					} else {
-						printInstances(r.Instances, r.Region)
+						cli.PrintInstances(r.Instances, r.Region)
 					}
 				}
 			}
@@ -465,16 +291,15 @@ func handleECS(action string, args []string) {
 			fmt.Fprintf(os.Stderr, "Usage: cloud-manage ecs detail <instance-id>\n")
 			os.Exit(1)
 		}
-		instanceId := args[0]
-		result, err := svc.GetInstanceDetail(accessKeyId, accessKeySecret, region, instanceId)
+		result, err := h.GetInstanceDetail(accessKeyId, accessKeySecret, region, args[0])
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		}
 		if outputJSON {
-			printJSON(result)
+			cli.PrintJSON(result)
 		} else {
-			printInstanceDetail(result)
+			cli.PrintInstanceDetail(result)
 		}
 
 	case "start":
@@ -482,51 +307,45 @@ func handleECS(action string, args []string) {
 			fmt.Fprintf(os.Stderr, "Usage: cloud-manage ecs start <instance-id>\n")
 			os.Exit(1)
 		}
-		instanceId := args[0]
-		err := svc.StartInstance(accessKeyId, accessKeySecret, region, instanceId)
-		if err != nil {
+		if err := h.StartInstance(accessKeyId, accessKeySecret, region, args[0]); err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		}
-		fmt.Printf("Instance %s start command sent successfully\n", instanceId)
+		fmt.Printf("Instance %s start command sent successfully\n", args[0])
 
 	case "stop":
 		if len(args) < 1 {
 			fmt.Fprintf(os.Stderr, "Usage: cloud-manage ecs stop <instance-id> [--force]\n")
 			os.Exit(1)
 		}
-		instanceId := args[0]
 		force := false
 		for _, arg := range args[1:] {
 			if arg == "--force" || arg == "-f" {
 				force = true
 			}
 		}
-		err := svc.StopInstance(accessKeyId, accessKeySecret, region, instanceId, force)
-		if err != nil {
+		if err := h.StopInstance(accessKeyId, accessKeySecret, region, args[0], force); err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		}
-		fmt.Printf("Instance %s stop command sent successfully\n", instanceId)
+		fmt.Printf("Instance %s stop command sent successfully\n", args[0])
 
 	case "reboot":
 		if len(args) < 1 {
 			fmt.Fprintf(os.Stderr, "Usage: cloud-manage ecs reboot <instance-id> [--force]\n")
 			os.Exit(1)
 		}
-		instanceId := args[0]
 		force := false
 		for _, arg := range args[1:] {
 			if arg == "--force" || arg == "-f" {
 				force = true
 			}
 		}
-		err := svc.RebootInstance(accessKeyId, accessKeySecret, region, instanceId, force)
-		if err != nil {
+		if err := h.RebootInstance(accessKeyId, accessKeySecret, region, args[0], force); err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		}
-		fmt.Printf("Instance %s reboot command sent successfully\n", instanceId)
+		fmt.Printf("Instance %s reboot command sent successfully\n", args[0])
 
 	default:
 		fmt.Println(`ECS Actions:
@@ -541,15 +360,14 @@ func handleECS(action string, args []string) {
 // ========== CMS ==========
 
 func handleCMS(action string, args []string) {
-	svc := service.NewCMSService()
+	h := cli.NewCMSHandler()
 
 	switch action {
 	case "products":
-		products := svc.GetSupportedProducts()
 		if outputJSON {
-			printJSON(products)
+			cli.PrintJSON(h.GetSupportedProducts())
 		} else {
-			printProducts(products)
+			cli.PrintProducts(h.GetSupportedProducts())
 		}
 
 	case "metrics":
@@ -557,16 +375,15 @@ func handleCMS(action string, args []string) {
 			fmt.Fprintf(os.Stderr, "Usage: cloud-manage cms metrics <instance-id>\n")
 			os.Exit(1)
 		}
-		instanceId := args[0]
-		result, err := svc.GetInstanceMetrics(accessKeyId, accessKeySecret, region, instanceId)
+		result, err := h.GetInstanceMetrics(accessKeyId, accessKeySecret, region, args[0])
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		}
 		if outputJSON {
-			printJSON(result)
+			cli.PrintJSON(result)
 		} else {
-			printMetrics(*result)
+			cli.PrintMetrics(*result)
 		}
 
 	default:
@@ -579,7 +396,7 @@ func handleCMS(action string, args []string) {
 // ========== SLS ==========
 
 func handleSLS(action string, args []string) {
-	svc := service.NewSLSService()
+	h := cli.NewSLSHandler()
 
 	switch action {
 	case "logstores":
@@ -587,37 +404,80 @@ func handleSLS(action string, args []string) {
 			fmt.Fprintf(os.Stderr, "Usage: cloud-manage sls logstores <project>\n")
 			os.Exit(1)
 		}
-		project := args[0]
-		logstores, err := svc.ListLogStores(accessKeyId, accessKeySecret, region, project)
+		logstores, err := h.ListLogStores(accessKeyId, accessKeySecret, region, args[0])
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		}
 		if outputJSON {
-			printJSON(logstores)
+			cli.PrintJSON(logstores)
 		} else {
-			fmt.Printf("LogStores in %s:\n", project)
+			fmt.Printf("LogStores in %s:\n", args[0])
 			for _, ls := range logstores {
 				fmt.Printf("  - %s\n", ls)
 			}
 		}
 
 	case "export":
-		handleSLSExport(svc, args)
+		if len(args) < 2 {
+			fmt.Fprintf(os.Stderr, "Usage: cloud-manage sls export <project> <logstore> [--format csv|json] [--output <file>] [--query <query>] [--from <time>] [--to <time>] [--max <lines>]\n")
+			os.Exit(1)
+		}
+		project, logstore := args[0], args[1]
+		query, format, outputPath := "", "csv", ""
+		fromStr, toStr := "", ""
+		maxLines := int64(1000)
+		for i := 2; i < len(args); i++ {
+			switch args[i] {
+			case "--query", "-q":
+				if i+1 < len(args) {
+					query = args[i+1]
+					i++
+				}
+			case "--format", "-f":
+				if i+1 < len(args) {
+					format = args[i+1]
+					i++
+				}
+			case "--output", "-o":
+				if i+1 < len(args) {
+					outputPath = args[i+1]
+					i++
+				}
+			case "--from":
+				if i+1 < len(args) {
+					fromStr = args[i+1]
+					i++
+				}
+			case "--to":
+				if i+1 < len(args) {
+					toStr = args[i+1]
+					i++
+				}
+			case "--max", "-m":
+				if i+1 < len(args) {
+					fmt.Sscanf(args[i+1], "%d", &maxLines)
+					i++
+				}
+			}
+		}
+		result, err := h.ExportLogs(accessKeyId, accessKeySecret, region, project, logstore, query, fromStr, toStr, maxLines, format, outputPath)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Printf("导出成功!\n  文件: %s\n  数量: %d 条\n  格式: %s\n", result.FilePath, result.Count, result.Format)
 
 	case "logs":
 		if len(args) < 2 {
 			fmt.Fprintf(os.Stderr, "Usage: cloud-manage sls logs <project> <logstore> [--query <query>] [--from <timestamp>] [--to <timestamp>] [--max <lines>]\n")
 			os.Exit(1)
 		}
-		project := args[0]
-		logstore := args[1]
-
+		project, logstore := args[0], args[1]
 		query := ""
 		from := time.Now().Add(-1 * time.Hour).Unix()
 		to := time.Now().Unix()
 		maxLines := int64(100)
-
 		for i := 2; i < len(args); i++ {
 			switch args[i] {
 			case "--query", "-q":
@@ -642,16 +502,15 @@ func handleSLS(action string, args []string) {
 				}
 			}
 		}
-
-		result, err := svc.QueryLogs(accessKeyId, accessKeySecret, region, project, logstore, query, from, to, maxLines)
+		result, err := h.QueryLogs(accessKeyId, accessKeySecret, region, project, logstore, query, from, to, maxLines)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		}
 		if outputJSON {
-			printJSON(result)
+			cli.PrintJSON(result)
 		} else {
-			printLogs(result)
+			cli.PrintLogs(result)
 		}
 
 	default:
@@ -672,100 +531,22 @@ Export Options:
 	}
 }
 
-func handleSLSExport(svc *service.SLSService, args []string) {
-	if len(args) < 2 {
-		fmt.Fprintf(os.Stderr, "Usage: cloud-manage sls export <project> <logstore> [--format csv|json] [--output <file>] [--query <query>] [--from <time>] [--to <time>] [--max <lines>]\n")
-		os.Exit(1)
-	}
-
-	project := args[0]
-	logstore := args[1]
-
-	query := ""
-	format := "csv"
-	outputPath := ""
-	fromStr := ""
-	toStr := ""
-	maxLines := int64(1000)
-
-	for i := 2; i < len(args); i++ {
-		switch args[i] {
-		case "--query", "-q":
-			if i+1 < len(args) {
-				query = args[i+1]
-				i++
-			}
-		case "--format", "-f":
-			if i+1 < len(args) {
-				format = args[i+1]
-				i++
-			}
-		case "--output", "-o":
-			if i+1 < len(args) {
-				outputPath = args[i+1]
-				i++
-			}
-		case "--from":
-			if i+1 < len(args) {
-				fromStr = args[i+1]
-				i++
-			}
-		case "--to":
-			if i+1 < len(args) {
-				toStr = args[i+1]
-				i++
-			}
-		case "--max", "-m":
-			if i+1 < len(args) {
-				fmt.Sscanf(args[i+1], "%d", &maxLines)
-				i++
-			}
-		}
-	}
-
-	// Parse time
-	now := time.Now()
-	from, err := service.ParseTime(fromStr, now.Add(-1*time.Hour))
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
-	}
-
-	to, err := service.ParseTime(toStr, now)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
-	}
-
-	// Export
-	result, err := svc.ExportLogs(accessKeyId, accessKeySecret, region, project, logstore, query, from, to, maxLines, format, outputPath)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
-	}
-
-	fmt.Printf("导出成功!\n")
-	fmt.Printf("  文件: %s\n", result.FilePath)
-	fmt.Printf("  数量: %d 条\n", result.Count)
-	fmt.Printf("  格式: %s\n", result.Format)
-}
-
 // ========== OSS ==========
 
 func handleOSS(action string, args []string) {
-	svc := service.NewOSSService()
+	h := cli.NewOSSHandler()
 
 	switch action {
 	case "buckets":
-		result, err := svc.ListBuckets(accessKeyId, accessKeySecret, region)
+		result, err := h.ListBuckets(accessKeyId, accessKeySecret, region)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		}
 		if outputJSON {
-			printJSON(result)
+			cli.PrintJSON(result)
 		} else {
-			printBuckets(result.Buckets)
+			cli.PrintBuckets(result.Buckets)
 		}
 
 	case "objects":
@@ -776,7 +557,6 @@ func handleOSS(action string, args []string) {
 		bucket := args[0]
 		prefix := ""
 		maxKeys := int32(100)
-
 		for i := 1; i < len(args); i++ {
 			switch args[i] {
 			case "--prefix", "-p":
@@ -791,16 +571,15 @@ func handleOSS(action string, args []string) {
 				}
 			}
 		}
-
-		result, err := svc.ListObjects(accessKeyId, accessKeySecret, region, bucket, prefix, maxKeys)
+		result, err := h.ListObjects(accessKeyId, accessKeySecret, region, bucket, prefix, maxKeys)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		}
 		if outputJSON {
-			printJSON(result)
+			cli.PrintJSON(result)
 		} else {
-			printObjects(result.Objects, bucket)
+			cli.PrintObjects(result.Objects, bucket)
 		}
 
 	default:
@@ -812,22 +591,22 @@ func handleOSS(action string, args []string) {
 	}
 }
 
-// ========== Output Formatting ==========
+// ========== VPC ==========
 
 func handleVPC(action string, args []string) {
-	svc := service.NewVPCService()
+	h := cli.NewVPCHandler()
 
 	switch action {
 	case "list":
-		result, err := svc.ListVPCs(accessKeyId, accessKeySecret, region)
+		result, err := h.ListVPCs(accessKeyId, accessKeySecret, region)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		}
 		if outputJSON {
-			printJSON(result)
+			cli.PrintJSON(result)
 		} else {
-			printVPCs(result.VPCs)
+			cli.PrintVPCs(result.VPCs)
 		}
 
 	case "detail":
@@ -835,16 +614,15 @@ func handleVPC(action string, args []string) {
 			fmt.Fprintf(os.Stderr, "Usage: cloud-manage vpc detail <vpc-id>\n")
 			os.Exit(1)
 		}
-		vpcId := args[0]
-		result, err := svc.GetVPCDetail(accessKeyId, accessKeySecret, region, vpcId)
+		result, err := h.GetVPCDetail(accessKeyId, accessKeySecret, region, args[0])
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		}
 		if outputJSON {
-			printJSON(result)
+			cli.PrintJSON(result)
 		} else {
-			printVPCDetail(result)
+			cli.PrintVPCDetail(result)
 		}
 
 	case "vswitches":
@@ -852,16 +630,15 @@ func handleVPC(action string, args []string) {
 			fmt.Fprintf(os.Stderr, "Usage: cloud-manage vpc vswitches <vpc-id>\n")
 			os.Exit(1)
 		}
-		vpcId := args[0]
-		result, err := svc.ListVSwitches(accessKeyId, accessKeySecret, region, vpcId)
+		result, err := h.ListVSwitches(accessKeyId, accessKeySecret, region, args[0])
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		}
 		if outputJSON {
-			printJSON(result)
+			cli.PrintJSON(result)
 		} else {
-			printVSwitches(result.VSwitches)
+			cli.PrintVSwitches(result.VSwitches)
 		}
 
 	default:
@@ -872,20 +649,22 @@ func handleVPC(action string, args []string) {
 	}
 }
 
+// ========== SLB ==========
+
 func handleSLB(action string, args []string) {
-	svc := service.NewSLBService()
+	h := cli.NewSLBHandler()
 
 	switch action {
 	case "list":
-		result, err := svc.ListSLBs(accessKeyId, accessKeySecret, region)
+		result, err := h.ListSLBs(accessKeyId, accessKeySecret, region)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		}
 		if outputJSON {
-			printJSON(result)
+			cli.PrintJSON(result)
 		} else {
-			printSLBs(result.SLBs)
+			cli.PrintSLBs(result.SLBs)
 		}
 
 	case "detail":
@@ -893,16 +672,15 @@ func handleSLB(action string, args []string) {
 			fmt.Fprintf(os.Stderr, "Usage: cloud-manage slb detail <slb-id>\n")
 			os.Exit(1)
 		}
-		slbId := args[0]
-		result, err := svc.GetSLBDetail(accessKeyId, accessKeySecret, region, slbId)
+		result, err := h.GetSLBDetail(accessKeyId, accessKeySecret, region, args[0])
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		}
 		if outputJSON {
-			printJSON(result)
+			cli.PrintJSON(result)
 		} else {
-			printSLBDetail(result)
+			cli.PrintSLBDetail(result)
 		}
 
 	case "listeners":
@@ -910,16 +688,15 @@ func handleSLB(action string, args []string) {
 			fmt.Fprintf(os.Stderr, "Usage: cloud-manage slb listeners <slb-id>\n")
 			os.Exit(1)
 		}
-		slbId := args[0]
-		result, err := svc.ListSLBListeners(accessKeyId, accessKeySecret, region, slbId)
+		result, err := h.ListSLBListeners(accessKeyId, accessKeySecret, region, args[0])
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		}
 		if outputJSON {
-			printJSON(result)
+			cli.PrintJSON(result)
 		} else {
-			printSLBListeners(result.Listeners)
+			cli.PrintSLBListeners(result.Listeners)
 		}
 
 	default:
@@ -927,232 +704,6 @@ func handleSLB(action string, args []string) {
   list                          列出 SLB 实例
   detail <slb-id>               查看 SLB 详情
   listeners <slb-id>            列出监听器`)
-	}
-}
-
-func printJSON(v interface{}) {
-	data, err := json.MarshalIndent(v, "", "  ")
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error marshaling JSON: %v\n", err)
-		os.Exit(1)
-	}
-	fmt.Println(string(data))
-}
-
-func printInstances(instances []service.ECSInstanceAdapter, region string) {
-	fmt.Printf("\n=== %s ===\n", region)
-	if len(instances) == 0 {
-		fmt.Println("No instances found")
-		return
-	}
-	for _, inst := range instances {
-		status := "●"
-		if inst.Status != "Running" {
-			status = "○"
-		}
-		fmt.Printf("  %s [%s] %-20s %-15s | Public: %-15s Private: %-15s\n",
-			status, inst.Status, inst.InstanceId, inst.InstanceName, inst.PublicIp, inst.PrivateIp)
-	}
-}
-
-func printInstanceDetail(d *service.InstanceDetailAdapter) {
-	fmt.Printf(`
-Instance Detail:
-  ID:               %s
-  Name:             %s
-  Description:      %s
-  Hostname:         %s
-  Status:           %s
-  Region:           %s
-  Zone:             %s
-  Type:             %s
-  CPU:              %d cores
-  Memory:           %d MB
-  Image:            %s
-  Charge Type:      %s
-  Created:          %s
-  Expired:          %s
-  Stopped Mode:     %s
-  Public IPs:       %s
-  Private IPs:      %s
-  Security Groups:  %s
-`,
-		d.InstanceId, d.InstanceName, d.Description, d.HostName,
-		d.Status, d.RegionId, d.ZoneId, d.InstanceType,
-		d.Cpu, d.Memory, d.ImageId, d.InternetChargeType,
-		d.CreationTime, d.ExpiredTime, d.StoppedMode,
-		strings.Join(d.PublicIp, ", "), strings.Join(d.PrivateIp, ", "),
-		strings.Join(d.SecurityGroupIds, ", "))
-}
-
-func printMetrics(m service.ECSMetricAdapter) {
-	fmt.Printf("\nMetrics for %s:\n", m.InstanceId)
-	if m.CPUUtilization != nil {
-		fmt.Printf("  CPU Utilization:     %.2f%%\n", *m.CPUUtilization)
-	}
-	if m.MemoryUtilization != nil {
-		fmt.Printf("  Memory Utilization:  %.2f%%\n", *m.MemoryUtilization)
-	}
-	if m.DiskReadBPS != nil {
-		fmt.Printf("  Disk Read BPS:       %.2f B/s\n", *m.DiskReadBPS)
-	}
-	if m.DiskWriteBPS != nil {
-		fmt.Printf("  Disk Write BPS:      %.2f B/s\n", *m.DiskWriteBPS)
-	}
-	if m.InternetRX != nil {
-		fmt.Printf("  Internet RX:         %.2f bps\n", *m.InternetRX)
-	}
-	if m.InternetTX != nil {
-		fmt.Printf("  Internet TX:         %.2f bps\n", *m.InternetTX)
-	}
-	fmt.Printf("  Update Time:         %s\n", m.UpdateTime)
-}
-
-func printProducts(products []service.CloudProduct) {
-	fmt.Printf("\n支持的云产品:\n")
-	for _, p := range products {
-		fmt.Printf("\n  [%s] %s (namespace: %s)\n", p.ID, p.Name, p.Namespace)
-		fmt.Println("  监控指标:")
-		for _, m := range p.Metrics {
-			fmt.Printf("    - %-30s %s (%s)\n", m.Name, m.Unit, m.Description)
-		}
-	}
-}
-
-func printLogs(result *service.LogQueryResult) {
-	fmt.Printf("\nFound %d logs (hasMore: %v):\n", result.Count, result.HasMore)
-	for _, entry := range result.Entries {
-		ts := time.Unix(entry.Timestamp/1000, 0)
-		fmt.Printf("\n[%s]\n", ts.Format("2006-01-02 15:04:05"))
-		for k, v := range entry.Content {
-			fmt.Printf("  %s: %s\n", k, v)
-		}
-	}
-}
-
-func printBuckets(buckets []service.BucketAdapter) {
-	if len(buckets) == 0 {
-		fmt.Println("No buckets found")
-		return
-	}
-	fmt.Printf("\nBuckets:\n")
-	for _, b := range buckets {
-		fmt.Printf("  %-30s %-15s %s\n", b.Name, b.Location, b.CreationDate)
-	}
-}
-
-func printObjects(objects []service.ObjectAdapter, bucket string) {
-	fmt.Printf("\nObjects in %s:\n", bucket)
-	if len(objects) == 0 {
-		fmt.Println("No objects found")
-		return
-	}
-	for _, obj := range objects {
-		size := formatSize(obj.Size)
-		fmt.Printf("  %-50s %10s %s\n", obj.Key, size, obj.LastModified)
-	}
-}
-
-func formatSize(bytes int64) string {
-	const unit = 1024
-	if bytes < unit {
-		return fmt.Sprintf("%d B", bytes)
-	}
-	div, exp := int64(unit), 0
-	for n := bytes / unit; n >= unit; n /= unit {
-		div *= unit
-		exp++
-	}
-	return fmt.Sprintf("%.1f %cB", float64(bytes)/float64(div), "KMGTPE"[exp])
-}
-
-func printVPCs(vpcs []service.VPCAdapter) {
-	if len(vpcs) == 0 {
-		fmt.Println("No VPCs found")
-		return
-	}
-	fmt.Printf("\nVPCs:\n")
-	for _, v := range vpcs {
-		fmt.Printf("  %-20s %-20s %-18s %s\n", v.VpcId, v.VpcName, v.CidrBlock, v.Status)
-	}
-}
-
-func printVPCDetail(d *service.VPCDetailAdapter) {
-	fmt.Printf(`
-VPC Detail:
-  ID:               %s
-  Name:             %s
-  CIDR:             %s
-  Status:           %s
-  Region:           %s
-  Description:      %s
-  Created:          %s
-  VSwitch IDs:      %s
-`,
-		d.VpcId, d.VpcName, d.CidrBlock, d.Status, d.RegionId,
-		d.Description, d.CreationTime, strings.Join(d.VSwitchIds, ", "))
-}
-
-func printVSwitches(vswitches []service.VSwitchAdapter) {
-	if len(vswitches) == 0 {
-		fmt.Println("No VSwitches found")
-		return
-	}
-	fmt.Printf("\nVSwitches:\n")
-	for _, vs := range vswitches {
-		fmt.Printf("  %-20s %-20s %-18s %s\n", vs.VSwitchId, vs.VSwitchName, vs.CidrBlock, vs.ZoneId)
-	}
-}
-
-func printSLBs(slbs []service.SLBAdapter) {
-	if len(slbs) == 0 {
-		fmt.Println("No SLBs found")
-		return
-	}
-	fmt.Printf("\nSLBs:\n")
-	for _, lb := range slbs {
-		fmt.Printf("  %-20s %-20s %-15s %-10s %s\n", lb.LoadBalancerId, lb.LoadBalancerName, lb.Address, lb.AddressType, lb.Status)
-	}
-}
-
-func printSLBDetail(d *service.SLBDetailAdapter) {
-	fmt.Printf(`
-SLB Detail:
-  ID:               %s
-  Name:             %s
-  Address:          %s
-  Address Type:     %s
-  Status:           %s
-  Region:           %s
-  VPC ID:           %s
-  VSwitch ID:       %s
-  Created:          %s
-  Listeners:        %d
-  Bandwidth:        %d Mbps
-`,
-		d.LoadBalancerId, d.LoadBalancerName, d.Address, d.AddressType,
-		d.Status, d.RegionId, d.VpcId, d.VSwitchId,
-		d.CreationTime, d.ListenerCount, d.Bandwidth)
-}
-
-func printSLBListeners(listeners []service.SLBListenerAdapter) {
-	if len(listeners) == 0 {
-		fmt.Println("No listeners found")
-		return
-	}
-	fmt.Printf("\nSLB Listeners:\n")
-	for _, l := range listeners {
-		fmt.Printf("  Port: %-6d Protocol: %-8s Status: %-10s Bandwidth: %d Mbps\n",
-			l.ListenerPort, l.ListenerProtocol, l.Status, l.Bandwidth)
-	}
-}
-
-func getAllRegions() []string {
-	return []string{
-		"cn-hangzhou", "cn-shanghai", "cn-beijing", "cn-shenzhen",
-		"cn-guangzhou", "cn-chengdu", "cn-hongkong",
-		"ap-southeast-1", "ap-southeast-2", "ap-southeast-3",
-		"us-east-1", "us-west-1", "eu-central-1", "eu-west-1",
 	}
 }
 
@@ -1187,28 +738,21 @@ func handleConfig(action string, args []string) {
 }
 
 func handleConfigInit(args []string) {
-	// Check if config already exists
 	if config.HasConfig() {
-		fmt.Fprintf(os.Stderr, "配置文件已存在: ")
 		path, _ := config.GetConfigPath()
-		fmt.Fprintf(os.Stderr, "%s\n", path)
+		fmt.Fprintf(os.Stderr, "配置文件已存在: %s\n", path)
 		fmt.Fprintf(os.Stderr, "使用 --force 参数强制重新生成\n")
 		os.Exit(1)
 	}
-
-	// Init config
 	if err := config.InitConfig(false); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
-
 	path, _ := config.GetConfigPath()
-	fmt.Printf("配置文件已生成: %s\n", path)
-	fmt.Println("请编辑配置文件，填入您的云账号凭证。")
+	fmt.Printf("配置文件已生成: %s\n请编辑配置文件，填入您的云账号凭证。\n", path)
 }
 
 func handleConfigAdd(args []string) {
-	// Parse --save flag
 	saveCredentials := false
 	filteredArgs := []string{}
 	for _, arg := range args {
@@ -1222,13 +766,10 @@ func handleConfigAdd(args []string) {
 
 	if len(args) < 1 {
 		fmt.Fprintf(os.Stderr, "Usage: cloud-manage config add <profile> [--save]\n")
-		fmt.Fprintf(os.Stderr, "  --save  保存加密的 AccessKey Secret 到配置文件\n")
 		os.Exit(1)
 	}
 
 	profileName := args[0]
-
-	// Check if config exists
 	if !config.HasConfig() {
 		fmt.Println("配置文件不存在，正在初始化...")
 		if err := config.InitConfig(false); err != nil {
@@ -1237,7 +778,6 @@ func handleConfigAdd(args []string) {
 		}
 	}
 
-	// Read credentials from flags or environment
 	akId := accessKeyId
 	if akId == "" {
 		akId = os.Getenv("CLOUD_ACCESS_KEY_ID")
@@ -1246,22 +786,16 @@ func handleConfigAdd(args []string) {
 	if akSecret == "" {
 		akSecret = os.Getenv("CLOUD_ACCESS_KEY_SECRET")
 	}
-	profileRegion := region
-
 	if akId == "" {
 		fmt.Fprintf(os.Stderr, "Error: AccessKey ID is required.\n")
-		fmt.Fprintf(os.Stderr, "Use -id flag or set CLOUD_ACCESS_KEY_ID environment variable.\n")
 		os.Exit(1)
 	}
 
-	// Create profile
 	profile := &config.Profile{
 		AccessKeyID:     akId,
 		AccessKeySecret: akSecret,
-		Region:          profileRegion,
+		Region:          region,
 	}
-
-	// Add profile
 	if err := config.AddProfile(profileName, profile, saveCredentials); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
@@ -1279,15 +813,11 @@ func handleConfigRemove(args []string) {
 		fmt.Fprintf(os.Stderr, "Usage: cloud-manage config remove <profile>\n")
 		os.Exit(1)
 	}
-
-	profileName := args[0]
-
-	if err := config.RemoveProfile(profileName); err != nil {
+	if err := config.RemoveProfile(args[0]); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
-
-	fmt.Printf("账号 '%s' 已删除。\n", profileName)
+	fmt.Printf("账号 '%s' 已删除。\n", args[0])
 }
 
 func handleConfigList(args []string) {
@@ -1296,23 +826,17 @@ func handleConfigList(args []string) {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
-
 	if len(cfg.Profiles) == 0 {
-		fmt.Println("没有配置任何账号。")
-		fmt.Println("使用 'cloud-manage config add <profile>' 添加账号。")
+		fmt.Println("没有配置任何账号。使用 'cloud-manage config add <profile>' 添加账号。")
 		return
 	}
-
 	fmt.Println("已配置的账号:")
 	fmt.Println()
-
-	// Sort profile names
 	names := make([]string, 0, len(cfg.Profiles))
 	for name := range cfg.Profiles {
 		names = append(names, name)
 	}
 	sort.Strings(names)
-
 	for _, name := range names {
 		profile := cfg.Profiles[name]
 		marker := " "
@@ -1321,7 +845,6 @@ func handleConfigList(args []string) {
 		}
 		fmt.Printf("  %s %-15s %-20s %s\n", marker, name, profile.AccessKeyID, profile.Region)
 	}
-
 	fmt.Println()
 	fmt.Println("* 表示当前使用的账号")
 }
@@ -1331,15 +854,11 @@ func handleConfigSwitch(args []string) {
 		fmt.Fprintf(os.Stderr, "Usage: cloud-manage config switch <profile>\n")
 		os.Exit(1)
 	}
-
-	profileName := args[0]
-
-	if err := config.SwitchProfile(profileName); err != nil {
+	if err := config.SwitchProfile(args[0]); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
-
-	fmt.Printf("已切换到账号 '%s'。\n", profileName)
+	fmt.Printf("已切换到账号 '%s'。\n", args[0])
 }
 
 func handleConfigShow(args []string) {
@@ -1348,24 +867,18 @@ func handleConfigShow(args []string) {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
-
 	if cfg.CurrentProfile == "" {
-		fmt.Println("当前没有设置默认账号。")
-		fmt.Println("使用 'cloud-manage config switch <profile>' 切换账号。")
+		fmt.Println("当前没有设置默认账号。使用 'cloud-manage config switch <profile>' 切换账号。")
 		return
 	}
-
 	profile, ok := cfg.Profiles[cfg.CurrentProfile]
 	if !ok {
 		fmt.Fprintf(os.Stderr, "Error: 当前账号 '%s' 不存在。\n", cfg.CurrentProfile)
 		os.Exit(1)
 	}
-
-	fmt.Printf("当前账号: %s\n", cfg.CurrentProfile)
-	fmt.Printf("  AccessKey ID: %s\n", profile.AccessKeyID)
-	fmt.Printf("  Region:       %s\n", profile.Region)
+	fmt.Printf("当前账号: %s\n  AccessKey ID: %s\n  Region: %s\n", cfg.CurrentProfile, profile.AccessKeyID, profile.Region)
 	if profile.Endpoint != "" {
-		fmt.Printf("  Endpoint:     %s\n", profile.Endpoint)
+		fmt.Printf("  Endpoint: %s\n", profile.Endpoint)
 	}
 }
 
@@ -1374,6 +887,45 @@ func handleConfigReset(args []string) {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
-
 	fmt.Println("配置文件已重置。")
+}
+
+func printUsage() {
+	fmt.Println(`Usage:
+  cloud-manage [flags] <service> <action> [args...]
+
+Modes:
+  --gui             Force GUI mode (requires display)
+  --tui             Force TUI mode (terminal UI)
+  --cli             Force CLI mode
+  (auto)            Auto-detect based on display environment
+
+Services:
+  ecs               ECS 实例管理
+  cms               云监控指标查询
+  sls               日志服务查询
+  oss               对象存储管理
+  vpc               VPC 网络管理
+  slb               负载均衡管理
+
+Commands:
+  help              显示帮助信息
+  version           显示版本号
+
+Flags:`)
+	flag.PrintDefaults()
+	fmt.Println(`
+Examples:
+  cloud-manage                          # Auto-detect mode
+  cloud-manage --tui                    # Force TUI mode
+  cloud-manage ecs list                 # CLI: List ECS instances
+  cloud-manage ecs detail i-xxx         # CLI: View ECS detail
+  cloud-manage sls logs proj logstore   # CLI: Query SLS logs
+  cloud-manage oss buckets              # CLI: List OSS buckets
+  cloud-manage vpc list                 # CLI: List VPCs
+  cloud-manage slb list                 # CLI: List SLBs
+
+Environment Variables:
+  CLOUD_ACCESS_KEY_ID      AccessKey ID
+  CLOUD_ACCESS_KEY_SECRET  AccessKey Secret`)
 }

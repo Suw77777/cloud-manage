@@ -243,6 +243,7 @@ func Load() (*Config, error) {
 }
 
 // Save saves the configuration to the file.
+// If the file exists, it preserves comments by updating values in place.
 func Save(cfg *Config) error {
 	path, err := GetConfigPath()
 	if err != nil {
@@ -255,6 +256,88 @@ func Save(cfg *Config) error {
 		return fmt.Errorf("failed to create config directory: %w", err)
 	}
 
+	// Check if file exists to preserve comments
+	if _, err := os.Stat(path); err == nil {
+		// File exists, update in place preserving comments
+		return saveWithComments(path, cfg)
+	}
+
+	// File doesn't exist, create new with demo YAML
+	return os.WriteFile(path, generateDemoYAML(), 0600)
+}
+
+// saveWithComments updates the config file preserving comments.
+func saveWithComments(path string, cfg *Config) error {
+	// Load existing YAML with comments
+	doc, err := LoadYAMLWithComments(path)
+	if err != nil {
+		// If can't parse, fall back to full rewrite
+		return saveFull(path, cfg)
+	}
+
+	if len(doc.Content) == 0 {
+		return saveFull(path, cfg)
+	}
+
+	root := doc.Content[0]
+	if root.Kind != yaml.MappingNode {
+		return saveFull(path, cfg)
+	}
+
+	// Update values
+	SetMappingValue(root, "version", cfg.Version)
+	SetMappingValue(root, "save_credentials", cfg.SaveCredentials)
+	SetMappingValue(root, "current_profile", cfg.CurrentProfile)
+	SetMappingValue(root, "theme", cfg.Theme)
+	SetMappingValue(root, "memory_limit", cfg.MemoryLimit)
+	SetMappingValue(root, "concurrency", cfg.Concurrency)
+
+	// Update profiles
+	profilesNode := FindMappingValue(root, "profiles")
+	if profilesNode == nil {
+		// Create profiles node
+		profilesNode = &yaml.Node{
+			Kind: yaml.MappingNode,
+			Tag:  "!!map",
+		}
+		SetMappingValue(root, "profiles", nil) // This won't work, need manual approach
+	}
+
+	// Update each profile
+	for name, profile := range cfg.Profiles {
+		profileNode := FindMappingValue(profilesNode, name)
+		if profileNode == nil {
+			// Create new profile node
+			profileNode = &yaml.Node{
+				Kind: yaml.MappingNode,
+				Tag:  "!!map",
+			}
+			// Add to profiles
+			keyNode := &yaml.Node{
+				Kind:  yaml.ScalarNode,
+				Value: name,
+				Tag:   "!!str",
+			}
+			profilesNode.Content = append(profilesNode.Content, keyNode, profileNode)
+		}
+
+		// Update profile values
+		SetMappingValue(profileNode, "access_key_id", profile.AccessKeyID)
+		if profile.AccessKeySecret != "" {
+			SetMappingValue(profileNode, "access_key_secret", profile.AccessKeySecret)
+		}
+		SetMappingValue(profileNode, "region", profile.Region)
+		if profile.Endpoint != "" {
+			SetMappingValue(profileNode, "endpoint", profile.Endpoint)
+		}
+	}
+
+	// Save preserving comments
+	return SaveYAMLWithComments(path, doc)
+}
+
+// saveFull does a full rewrite of the config file.
+func saveFull(path string, cfg *Config) error {
 	// Marshal to YAML
 	data, err := yaml.Marshal(cfg)
 	if err != nil {
@@ -269,15 +352,7 @@ func Save(cfg *Config) error {
 
 	// Write file with restricted permissions
 	fullData := append(header, data...)
-	if err := os.WriteFile(path, fullData, 0600); err != nil {
-		return fmt.Errorf("failed to write config file: %w", err)
-	}
-
-	mu.Lock()
-	globalConfig = cfg
-	mu.Unlock()
-
-	return nil
+	return os.WriteFile(path, fullData, 0600)
 }
 
 // DefaultConfig returns a default configuration.

@@ -15,6 +15,9 @@ type VPCView struct {
 	service    *service.VPCService
 	width      int
 	height     int
+	ak         string
+	sk         string
+	region     string
 }
 
 func NewVPCView() VPCView {
@@ -23,6 +26,12 @@ func NewVPCView() VPCView {
 		detail:  components.NewDetail("VPC Detail"),
 		service: service.NewVPCService(),
 	}
+}
+
+func (v *VPCView) SetCredentials(ak, sk, region string) {
+	v.ak = ak
+	v.sk = sk
+	v.region = region
 }
 
 func (v *VPCView) SetSize(width, height int) {
@@ -105,4 +114,13 @@ func (v VPCView) Render() string {
 	}
 
 	return v.table.Render()
+}
+
+func (v *VPCView) HandleMessage(msg tea.Msg) tea.Cmd {
+	switch m := msg.(type) {
+	case tea.KeyMsg:
+		return v.HandleKey(m)
+	default:
+		return v.Update(msg)
+	}
 }

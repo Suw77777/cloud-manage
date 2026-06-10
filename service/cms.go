@@ -16,12 +16,12 @@ type CMSService struct {
 	providerFactory CMSProviderFactory
 }
 
-// NewCMSService creates a new CMSService with default provider factory.
+// NewCMSService creates a new CMSService with default provider factory (cached).
 func NewCMSService() *CMSService {
 	return &CMSService{
-		providerFactory: func(accessKeyId, accessKeySecret, region string) (provider.CMSProvider, error) {
+		providerFactory: CachedFactory("cms", func(accessKeyId, accessKeySecret, region string) (provider.CMSProvider, error) {
 			return aliyun.NewCMSProvider(accessKeyId, accessKeySecret, region)
-		},
+		}),
 	}
 }
 

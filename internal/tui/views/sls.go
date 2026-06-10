@@ -16,6 +16,9 @@ type SLSView struct {
 	service *service.SLSService
 	width   int
 	height  int
+	ak      string
+	sk      string
+	region  string
 }
 
 func NewSLSView() SLSView {
@@ -24,6 +27,12 @@ func NewSLSView() SLSView {
 		detail:  components.NewDetail("Log Detail"),
 		service: service.NewSLSService(),
 	}
+}
+
+func (v *SLSView) SetCredentials(ak, sk, region string) {
+	v.ak = ak
+	v.sk = sk
+	v.region = region
 }
 
 func (v *SLSView) SetSize(width, height int) {
@@ -97,4 +106,13 @@ func (v SLSView) Render() string {
 		return "Loading..."
 	}
 	return v.table.Render()
+}
+
+func (v *SLSView) HandleMessage(msg tea.Msg) tea.Cmd {
+	switch m := msg.(type) {
+	case tea.KeyMsg:
+		return v.HandleKey(m)
+	default:
+		return v.Update(msg)
+	}
 }

@@ -16,12 +16,12 @@ type OSSService struct {
 	providerFactory OSSProviderFactory
 }
 
-// NewOSSService creates a new OSSService with default provider factory.
+// NewOSSService creates a new OSSService with default provider factory (cached).
 func NewOSSService() *OSSService {
 	return &OSSService{
-		providerFactory: func(accessKeyId, accessKeySecret, region string) (provider.OSSProvider, error) {
+		providerFactory: CachedFactory("oss", func(accessKeyId, accessKeySecret, region string) (provider.OSSProvider, error) {
 			return aliyun.NewOSSProvider(accessKeyId, accessKeySecret, region)
-		},
+		}),
 	}
 }
 

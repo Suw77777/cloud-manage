@@ -16,12 +16,12 @@ type ECSService struct {
 	providerFactory ECSProviderFactory
 }
 
-// NewECSService creates a new ECSService with default provider factory.
+// NewECSService creates a new ECSService with default provider factory (cached).
 func NewECSService() *ECSService {
 	return &ECSService{
-		providerFactory: func(accessKeyId, accessKeySecret, region string) (provider.ECSProvider, error) {
+		providerFactory: CachedFactory("ecs", func(accessKeyId, accessKeySecret, region string) (provider.ECSProvider, error) {
 			return aliyun.NewECSProvider(accessKeyId, accessKeySecret, region)
-		},
+		}),
 	}
 }
 

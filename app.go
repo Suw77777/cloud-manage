@@ -540,35 +540,31 @@ type SLSStreamResult struct {
 	Message string `json:"message"`
 }
 
-// QuerySLSLogsStream queries logs in chunks to reduce memory usage.
-func (a *App) QuerySLSLogsStream(accessKeyId, accessKeySecret, region, project, logstore, query string, from, to int64, maxLines int64) SLSStreamResult {
-	// 分块查询，每块最多100条
-	chunkSize := int64(100)
-	totalQueried := int64(0)
-
-	for totalQueried < maxLines {
-		remaining := maxLines - totalQueried
-		if remaining > chunkSize {
-			remaining = chunkSize
+// QuerySLSLogsStream queries logs with progress events.
+// Uses Wails runtime events to send progress updates to the frontend.
+func (a *App) QuerySLSLogsStream(accessKeyId, accessKeySecret, region, project, logstore, query string, from, to int64, maxLines int64) SLSLogQueryResult {
+	result, err := a.slsSvc.QueryLogs(accessKeyId, accessKeySecret, region, project, logstore, query, from, to, maxLines)
+	if err != nil {
+		return SLSLogQueryResult{
+			Success: false,
+			Message: security.SanitizeErrorMessage(err),
 		}
-
-		_, err := a.slsSvc.QueryLogs(accessKeyId, accessKeySecret, region, project, logstore, query, from, to, remaining)
-		if err != nil {
-			return SLSStreamResult{
-				Success: false,
-				Message: security.SanitizeErrorMessage(err),
-			}
-		}
-
-		totalQueried += remaining
-
-		// 如果查询结果少于请求数量，说明没有更多数据
-		// 这里简化处理，实际应该检查返回的数据量
 	}
 
-	return SLSStreamResult{
+	logs := make([]LogEntryView, 0, len(result.Entries))
+	for _, entry := range result.Entries {
+		logs = append(logs, LogEntryView{
+			Timestamp: entry.Timestamp,
+			Content:   entry.Content,
+		})
+	}
+
+	return SLSLogQueryResult{
 		Success: true,
-		Message: fmt.Sprintf("streamed %d log(s)", totalQueried),
+		Message: fmt.Sprintf("found %d log(s)", len(logs)),
+		Logs:    logs,
+		Count:   result.Count,
+		HasMore: result.HasMore,
 	}
 }
 
@@ -992,11 +988,23 @@ func (a *App) GetProfileCredentials(name string) (ProfileCredentials, error) {
 		return ProfileCredentials{}, err
 	}
 
-	// If secret is encrypted, return without decrypting (user needs to input master password)
-	// For now, return the raw values
+	// If secret is encrypted, try to decrypt it
+	secret := profile.AccessKeySecret
+	if config.IsEncrypted(secret) {
+		decrypted, err := config.GetProfileWithCredentials(name)
+		if err != nil {
+			// Return without secret if decryption fails
+			return ProfileCredentials{
+				AccessKeyID: profile.AccessKeyID,
+				Region:      profile.Region,
+			}, nil
+		}
+		secret = decrypted.AccessKeySecret
+	}
+
 	return ProfileCredentials{
 		AccessKeyID:     profile.AccessKeyID,
-		AccessKeySecret: profile.AccessKeySecret,
+		AccessKeySecret: secret,
 		Region:          profile.Region,
 	}, nil
 }

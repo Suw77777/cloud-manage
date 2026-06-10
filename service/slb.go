@@ -15,12 +15,12 @@ type SLBService struct {
 	providerFactory SLBProviderFactory
 }
 
-// NewSLBService 创建使用默认 Provider 工厂的 SLBService。
+// NewSLBService 创建使用默认 Provider 工厂的 SLBService（带缓存）。
 func NewSLBService() *SLBService {
 	return &SLBService{
-		providerFactory: func(accessKeyId, accessKeySecret, region string) (provider.SLBProvider, error) {
+		providerFactory: CachedFactory("slb", func(accessKeyId, accessKeySecret, region string) (provider.SLBProvider, error) {
 			return aliyun.NewSLBProvider(accessKeyId, accessKeySecret, region)
-		},
+		}),
 	}
 }
 

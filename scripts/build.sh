@@ -21,7 +21,7 @@ if [ "$1" = "--gui" ]; then
     echo "==> Build complete. Output: build/bin/cloud-manage"
 else
     echo "Building CLI/TUI version..."
-    go build -o cloud-manage .
+    go build -trimpath -ldflags "-s -w" -o cloud-manage .
     echo ""
     echo "==> Build complete. Output: cloud-manage"
 fi

@@ -15,6 +15,9 @@ type SLBView struct {
 	service    *service.SLBService
 	width      int
 	height     int
+	ak         string
+	sk         string
+	region     string
 }
 
 func NewSLBView() SLBView {
@@ -23,6 +26,12 @@ func NewSLBView() SLBView {
 		detail:  components.NewDetail("SLB Detail"),
 		service: service.NewSLBService(),
 	}
+}
+
+func (v *SLBView) SetCredentials(ak, sk, region string) {
+	v.ak = ak
+	v.sk = sk
+	v.region = region
 }
 
 func (v *SLBView) SetSize(width, height int) {
@@ -107,4 +116,13 @@ func (v SLBView) Render() string {
 	}
 
 	return v.table.Render()
+}
+
+func (v *SLBView) HandleMessage(msg tea.Msg) tea.Cmd {
+	switch m := msg.(type) {
+	case tea.KeyMsg:
+		return v.HandleKey(m)
+	default:
+		return v.Update(msg)
+	}
 }
