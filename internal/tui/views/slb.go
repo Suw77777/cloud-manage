@@ -1,6 +1,7 @@
 package views
 
 import (
+	"cloud-manage/internal/handler"
 	"cloud-manage/internal/tui/components"
 	"cloud-manage/service"
 
@@ -12,7 +13,7 @@ type SLBView struct {
 	detail     components.Detail
 	loading    bool
 	showDetail bool
-	service    *service.SLBService
+	handler    *handler.SLBHandler
 	width      int
 	height     int
 	ak         string
@@ -24,7 +25,7 @@ func NewSLBView() SLBView {
 	return SLBView{
 		table:   components.NewTable([]string{"SLB ID", "Name", "Address", "Type", "Status", "VPC"}),
 		detail:  components.NewDetail("SLB Detail"),
-		service: service.NewSLBService(),
+		handler: handler.NewSLBHandler(),
 	}
 }
 
@@ -43,7 +44,7 @@ func (v *SLBView) SetSize(width, height int) {
 
 func (v *SLBView) LoadData(accessKeyId, accessKeySecret, region string) tea.Cmd {
 	return func() tea.Msg {
-		result, err := v.service.ListSLBs(accessKeyId, accessKeySecret, region)
+		result, err := v.handler.ListSLBs(accessKeyId, accessKeySecret, region)
 		if err != nil {
 			return SLBLoadError{err}
 		}

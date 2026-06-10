@@ -1,6 +1,7 @@
 package views
 
 import (
+	"cloud-manage/internal/handler"
 	"cloud-manage/internal/tui/components"
 	"cloud-manage/service"
 
@@ -12,7 +13,7 @@ type VPCView struct {
 	detail     components.Detail
 	loading    bool
 	showDetail bool
-	service    *service.VPCService
+	handler    *handler.VPCHandler
 	width      int
 	height     int
 	ak         string
@@ -24,7 +25,7 @@ func NewVPCView() VPCView {
 	return VPCView{
 		table:   components.NewTable([]string{"VPC ID", "Name", "CIDR", "Status", "Region"}),
 		detail:  components.NewDetail("VPC Detail"),
-		service: service.NewVPCService(),
+		handler: handler.NewVPCHandler(),
 	}
 }
 
@@ -43,7 +44,7 @@ func (v *VPCView) SetSize(width, height int) {
 
 func (v *VPCView) LoadData(accessKeyId, accessKeySecret, region string) tea.Cmd {
 	return func() tea.Msg {
-		result, err := v.service.ListVPCs(accessKeyId, accessKeySecret, region)
+		result, err := v.handler.ListVPCs(accessKeyId, accessKeySecret, region)
 		if err != nil {
 			return VPCLoadError{err}
 		}

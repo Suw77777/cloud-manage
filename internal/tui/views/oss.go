@@ -1,18 +1,19 @@
 package views
 
 import (
+	"cloud-manage/internal/handler"
+	"cloud-manage/internal/tui/components"
+	"cloud-manage/service"
 	"fmt"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"cloud-manage/internal/tui/components"
-	"cloud-manage/service"
 )
 
 type OSSView struct {
 	table      components.Table
 	detail     components.Detail
 	loading    bool
-	service    *service.OSSService
+	handler    *handler.OSSHandler
 	showBucket bool
 	bucket     string
 	width      int
@@ -26,7 +27,7 @@ func NewOSSView() OSSView {
 	return OSSView{
 		table:   components.NewTable([]string{"Name", "Location", "Created"}),
 		detail:  components.NewDetail("Bucket Detail"),
-		service: service.NewOSSService(),
+		handler: handler.NewOSSHandler(),
 	}
 }
 
@@ -45,7 +46,7 @@ func (v *OSSView) SetSize(width, height int) {
 
 func (v *OSSView) LoadBuckets(accessKeyId, accessKeySecret, region string) tea.Cmd {
 	return func() tea.Msg {
-		result, err := v.service.ListBuckets(accessKeyId, accessKeySecret, region)
+		result, err := v.handler.ListBuckets(accessKeyId, accessKeySecret, region)
 		if err != nil {
 			return OSSLoadError{err}
 		}
@@ -55,7 +56,7 @@ func (v *OSSView) LoadBuckets(accessKeyId, accessKeySecret, region string) tea.C
 
 func (v *OSSView) LoadObjects(accessKeyId, accessKeySecret, region, bucket string) tea.Cmd {
 	return func() tea.Msg {
-		result, err := v.service.ListObjects(accessKeyId, accessKeySecret, region, bucket, "", 100)
+		result, err := v.handler.ListObjects(accessKeyId, accessKeySecret, region, bucket, "", 100)
 		if err != nil {
 			return OSSLoadError{err}
 		}

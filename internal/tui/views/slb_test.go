@@ -14,8 +14,8 @@ func TestNewSLBView(t *testing.T) {
 	if view.showDetail {
 		t.Error("expected showDetail to be false initially")
 	}
-	if view.service == nil {
-		t.Error("expected non-nil service")
+	if view.handler == nil {
+		t.Error("expected non-nil handler")
 	}
 }
 

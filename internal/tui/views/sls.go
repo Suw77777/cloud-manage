@@ -1,19 +1,20 @@
 package views
 
 import (
+	"cloud-manage/internal/handler"
+	"cloud-manage/internal/tui/components"
+	"cloud-manage/service"
 	"fmt"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"cloud-manage/internal/tui/components"
-	"cloud-manage/service"
 )
 
 type SLSView struct {
 	table   components.Table
 	detail  components.Detail
 	loading bool
-	service *service.SLSService
+	handler *handler.SLSHandler
 	width   int
 	height  int
 	ak      string
@@ -25,7 +26,7 @@ func NewSLSView() SLSView {
 	return SLSView{
 		table:   components.NewTable([]string{"Timestamp", "Level", "Message"}),
 		detail:  components.NewDetail("Log Detail"),
-		service: service.NewSLSService(),
+		handler: handler.NewSLSHandler(),
 	}
 }
 
@@ -46,7 +47,7 @@ func (v *SLSView) LoadData(accessKeyId, accessKeySecret, region, project, logsto
 	return func() tea.Msg {
 		from := time.Now().Add(-1 * time.Hour).Unix()
 		to := time.Now().Unix()
-		result, err := v.service.QueryLogs(accessKeyId, accessKeySecret, region, project, logstore, query, from, to, 100)
+		result, err := v.handler.QueryLogs(accessKeyId, accessKeySecret, region, project, logstore, query, from, to, 100)
 		if err != nil {
 			return SLSLoadError{err}
 		}

@@ -2,8 +2,8 @@ package views
 
 import (
 	"cloud-manage/internal/consts"
+	"cloud-manage/internal/handler"
 	"cloud-manage/internal/tui/components"
-	"cloud-manage/service"
 	"fmt"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -14,7 +14,7 @@ type ECSView struct {
 	detail     components.Detail
 	loading    bool
 	showDetail bool
-	service    *service.ECSService
+	handler    *handler.ECSHandler
 	width      int
 	height     int
 	ak         string
@@ -26,7 +26,7 @@ func NewECSView() ECSView {
 	return ECSView{
 		table:   components.NewTable([]string{"ID", "Name", "Status", "Public IP", "Private IP"}),
 		detail:  components.NewDetail("Instance Detail"),
-		service: service.NewECSService(),
+		handler: handler.NewECSHandler(),
 	}
 }
 
@@ -45,7 +45,7 @@ func (v *ECSView) SetSize(width, height int) {
 
 func (v *ECSView) LoadData(accessKeyId, accessKeySecret, region string) tea.Cmd {
 	return func() tea.Msg {
-		result, err := v.service.ListInstances(accessKeyId, accessKeySecret, region)
+		result, err := v.handler.ListInstances(accessKeyId, accessKeySecret, region)
 		if err != nil {
 			return ECSLoadError{err}
 		}
@@ -54,7 +54,7 @@ func (v *ECSView) LoadData(accessKeyId, accessKeySecret, region string) tea.Cmd 
 }
 
 type ECSLoaded struct {
-	Result *service.ListInstancesResult
+	Result *handler.ECSListResult
 }
 
 type ECSLoadError struct {
@@ -65,6 +65,7 @@ func (v *ECSView) Update(msg tea.Msg) tea.Cmd {
 	switch msg := msg.(type) {
 	case ECSLoaded:
 		v.loading = false
+		v.region = msg.Result.Region
 		rows := make([][]string, 0)
 		for _, inst := range msg.Result.Instances {
 			rows = append(rows, []string{
@@ -103,7 +104,6 @@ func (v *ECSView) HandleKey(msg tea.KeyMsg) tea.Cmd {
 		v.showDetail = false
 		v.detail.Clear()
 	case "R":
-		// Cycle to next region
 		regions := consts.AllRegions
 		for i, r := range regions {
 			if r.ID == v.region {
@@ -129,7 +129,6 @@ func (v ECSView) Render() string {
 	return fmt.Sprintf("  Region: %s (R to switch)\n\n", v.region) + v.table.Render()
 }
 
-// HandleMessage routes messages to Update or HandleKey.
 func (v *ECSView) HandleMessage(msg tea.Msg) tea.Cmd {
 	switch m := msg.(type) {
 	case tea.KeyMsg:

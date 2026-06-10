@@ -1,18 +1,19 @@
 package views
 
 import (
+	"cloud-manage/internal/handler"
+	"cloud-manage/internal/tui/components"
+	"cloud-manage/service"
 	"fmt"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"cloud-manage/internal/tui/components"
-	"cloud-manage/service"
 )
 
 type CMSView struct {
 	table   components.Table
 	detail  components.Detail
 	loading bool
-	service *service.CMSService
+	handler *handler.CMSHandler
 	width   int
 	height  int
 	ak      string
@@ -24,7 +25,7 @@ func NewCMSView() CMSView {
 	return CMSView{
 		table:   components.NewTable([]string{"Metric", "Value", "Unit"}),
 		detail:  components.NewDetail("Metric Detail"),
-		service: service.NewCMSService(),
+		handler: handler.NewCMSHandler(),
 	}
 }
 
@@ -43,7 +44,7 @@ func (v *CMSView) SetSize(width, height int) {
 
 func (v *CMSView) LoadData(accessKeyId, accessKeySecret, region, instanceId string) tea.Cmd {
 	return func() tea.Msg {
-		result, err := v.service.GetInstanceMetrics(accessKeyId, accessKeySecret, region, instanceId)
+		result, err := v.handler.GetInstanceMetrics(accessKeyId, accessKeySecret, region, instanceId)
 		if err != nil {
 			return CMSLoadError{err}
 		}

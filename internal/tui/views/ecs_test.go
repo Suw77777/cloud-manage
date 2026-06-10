@@ -1,6 +1,7 @@
 package views
 
 import (
+	"cloud-manage/internal/handler"
 	"cloud-manage/service"
 	"strings"
 	"testing"
@@ -15,8 +16,8 @@ func TestNewECSView(t *testing.T) {
 	if view.showDetail {
 		t.Error("expected showDetail to be false initially")
 	}
-	if view.service == nil {
-		t.Error("expected non-nil service")
+	if view.handler == nil {
+		t.Error("expected non-nil handler")
 	}
 }
 
@@ -37,12 +38,13 @@ func TestECSView_Update_Loaded(t *testing.T) {
 	view.SetSize(100, 50)
 
 	msg := ECSLoaded{
-		Result: &service.ListInstancesResult{
+		Result: &handler.ECSListResult{
+			Region: "cn-hangzhou",
 			Instances: []service.ECSInstanceAdapter{
 				{InstanceId: "i-001", InstanceName: "test-1", Status: "Running"},
 				{InstanceId: "i-002", InstanceName: "test-2", Status: "Stopped"},
 			},
-			TotalCount: 2,
+			Total: 2,
 		},
 	}
 

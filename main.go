@@ -4,6 +4,7 @@ import (
 	"cloud-manage/internal/cli"
 	"cloud-manage/internal/config"
 	"cloud-manage/internal/consts"
+	"cloud-manage/internal/handler"
 	"cloud-manage/internal/tui"
 	"embed"
 	"flag"
@@ -252,7 +253,7 @@ func runCLI() {
 // ========== ECS ==========
 
 func handleECS(action string, args []string) {
-	h := cli.NewECSHandler()
+	h := handler.NewECSHandler()
 
 	switch action {
 	case "list":
@@ -360,7 +361,7 @@ func handleECS(action string, args []string) {
 // ========== CMS ==========
 
 func handleCMS(action string, args []string) {
-	h := cli.NewCMSHandler()
+	h := handler.NewCMSHandler()
 
 	switch action {
 	case "products":
@@ -396,7 +397,7 @@ func handleCMS(action string, args []string) {
 // ========== SLS ==========
 
 func handleSLS(action string, args []string) {
-	h := cli.NewSLSHandler()
+	h := handler.NewSLSHandler()
 
 	switch action {
 	case "logstores":
@@ -534,7 +535,7 @@ Export Options:
 // ========== OSS ==========
 
 func handleOSS(action string, args []string) {
-	h := cli.NewOSSHandler()
+	h := handler.NewOSSHandler()
 
 	switch action {
 	case "buckets":
@@ -594,7 +595,7 @@ func handleOSS(action string, args []string) {
 // ========== VPC ==========
 
 func handleVPC(action string, args []string) {
-	h := cli.NewVPCHandler()
+	h := handler.NewVPCHandler()
 
 	switch action {
 	case "list":
@@ -652,7 +653,7 @@ func handleVPC(action string, args []string) {
 // ========== SLB ==========
 
 func handleSLB(action string, args []string) {
-	h := cli.NewSLBHandler()
+	h := handler.NewSLBHandler()
 
 	switch action {
 	case "list":
