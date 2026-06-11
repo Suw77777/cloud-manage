@@ -211,10 +211,13 @@ func runCLI() {
 	}
 
 	serviceName, action := args[0], ""
+	remainingArgs := []string{}
 	if len(args) > 1 {
 		action = args[1]
 	}
-	remainingArgs := args[2:]
+	if len(args) > 2 {
+		remainingArgs = args[2:]
+	}
 
 	needsCredentials := action != "" && !(serviceName == "cms" && action == "products") && serviceName != "config"
 	if needsCredentials && (accessKeyId == "" || accessKeySecret == "") {
