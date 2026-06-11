@@ -10,6 +10,7 @@ import (
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 type Tab int
@@ -35,6 +36,7 @@ type App struct {
 	accessSecret textinput.Model
 	regionInput  textinput.Model
 	focusIndex   int // 0=accessKeyId, 1=secret, 2=region
+	loginError   string
 
 	// Credentials (set after login)
 	ak     string
@@ -252,6 +254,20 @@ func (a *App) updateLogin(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		a.updateFocus()
 	case "enter":
 		if a.focusIndex == 2 {
+			// Validate
+			a.loginError = ""
+			if a.accessKeyId.Value() == "" {
+				a.loginError = "AccessKey ID 不能为空"
+				a.focusIndex = 0
+				a.updateFocus()
+				return a, nil
+			}
+			if a.accessSecret.Value() == "" {
+				a.loginError = "AccessKey Secret 不能为空"
+				a.focusIndex = 1
+				a.updateFocus()
+				return a, nil
+			}
 			// Submit
 			a.ak = a.accessKeyId.Value()
 			a.sk = a.accessSecret.Value()
@@ -327,23 +343,53 @@ func (a App) View() string {
 }
 
 func (a App) renderLogin() string {
-	title := TitleBarStyle.Width(a.width).Render("Cloud Manage - 登录")
+	title := TitleBarStyle.Width(a.width).Render(fmt.Sprintf("  Cloud 管理小助手 %s", consts.Version))
 
-	content := fmt.Sprintf(`
-  请输入阿里云凭证：
+	// Box style
+	boxStyle := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(Primary).
+		Padding(1, 3).
+		Width(60)
 
-  %s
-  %s
-  %s
+	// Label style
+	labelStyle := lipgloss.NewStyle().
+		Foreground(Gray).
+		Width(18)
 
-  按 Tab/↑↓ 切换输入框，Enter 确认，Esc 退出
-`, a.accessKeyId.View(), a.accessSecret.View(), a.regionInput.View())
+	// Error style
+	errorStyle := lipgloss.NewStyle().
+		Foreground(Error).
+		Bold(true)
 
-	return fmt.Sprintf("%s\n%s", title, content)
+	// Build form
+	var form string
+	form += labelStyle.Render("AccessKey ID") + a.accessKeyId.View() + "\n\n"
+	form += labelStyle.Render("AccessKey Secret") + a.accessSecret.View() + "\n\n"
+	form += labelStyle.Render("Region") + a.regionInput.View() + "\n"
+
+	// Error message
+	if a.loginError != "" {
+		form += "\n" + errorStyle.Render("  ⚠ "+a.loginError)
+	}
+
+	// Help text
+	helpStyle := lipgloss.NewStyle().Foreground(Gray)
+	help := helpStyle.Render("  Tab/↑↓ 切换  Enter 确认  Esc 退出")
+
+	// Center the box
+	box := boxStyle.Render(form)
+	gap := (a.width - 66) / 2
+	if gap < 0 {
+		gap = 0
+	}
+	padding := lipgloss.NewStyle().PaddingLeft(gap).Render(box)
+
+	return fmt.Sprintf("\n%s\n\n%s\n%s", title, padding, help)
 }
 
 func (a App) renderMain() string {
-	title := TitleBarStyle.Width(a.width).Render(fmt.Sprintf("Cloud Manage TUI %s | Region: %s", consts.Version, a.region))
+	title := TitleBarStyle.Width(a.width).Render(fmt.Sprintf("  Cloud 管理小助手 %s  |  Region: %s", consts.Version, a.region))
 	tabs := renderTabs(a.activeTab)
 
 	var content string
@@ -362,19 +408,26 @@ func (a App) renderMain() string {
 		content = a.slbView.Render()
 	}
 
-	status := StatusBarStyle.Width(a.width).Render("  1-6 Switch Tab | ←→ Tab | ↑↓/jk Navigate | Enter Detail | Esc Back | q Quit")
+	// Content area with padding
+	contentStyle := lipgloss.NewStyle().Padding(0, 2)
+	body := contentStyle.Render(content)
 
-	return fmt.Sprintf("%s\n%s\n\n%s\n%s", title, tabs, content, status)
+	status := StatusBarStyle.Width(a.width).Render("  1-6 Tab  |  ←→ Switch  |  ↑↓/jk Navigate  |  Enter Detail  |  Esc Back  |  q Quit")
+
+	return fmt.Sprintf("\n%s\n%s\n\n%s\n%s", title, tabs, body, status)
 }
 
 func renderTabs(active Tab) string {
 	var rendered string
 	for i, name := range tabNames {
 		if i == int(active) {
-			rendered += ActiveTabStyle.Render(name) + " "
+			rendered += ActiveTabStyle.Render(fmt.Sprintf(" %s ", name))
 		} else {
-			rendered += TabStyle.Render(name) + " "
+			rendered += TabStyle.Render(fmt.Sprintf(" %s ", name))
+		}
+		if i < len(tabNames)-1 {
+			rendered += " "
 		}
 	}
-	return rendered
+	return lipgloss.NewStyle().Padding(0, 2).Render(rendered)
 }
