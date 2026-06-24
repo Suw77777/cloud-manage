@@ -136,13 +136,15 @@ func PromptMasterPassword(prompt string) (string, error) {
 		return cached, nil
 	}
 
-	// Prompt for password
+	return promptPasswordDirect(prompt)
+}
+
+// promptPasswordDirect always reads a password from stdin, ignoring cache and env vars.
+func promptPasswordDirect(prompt string) (string, error) {
 	fmt.Print(prompt)
 
-	// Try to read password without echo
 	password, err := term.ReadPassword(int(syscall.Stdin))
 	if err != nil {
-		// Fallback to regular input
 		reader := bufio.NewReader(os.Stdin)
 		passwordStr, err := reader.ReadString('\n')
 		if err != nil {
@@ -150,7 +152,7 @@ func PromptMasterPassword(prompt string) (string, error) {
 		}
 		password = []byte(strings.TrimSpace(passwordStr))
 	} else {
-		fmt.Println() // New line after password input
+		fmt.Println()
 	}
 
 	passwordStr := string(password)
@@ -176,7 +178,7 @@ func PromptNewPassword() (string, error) {
 		}
 	}
 
-	confirm, err := PromptMasterPassword("确认主密码: ")
+	confirm, err := promptPasswordDirect("确认主密码: ")
 	if err != nil {
 		return "", err
 	}
@@ -228,6 +230,7 @@ func Load() (*Config, error) {
 		if err := migrate(cfg); err != nil {
 			return nil, fmt.Errorf("failed to migrate config: %w", err)
 		}
+		Save(cfg)
 	}
 
 	// Validate

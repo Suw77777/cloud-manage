@@ -261,7 +261,7 @@ func exportToCSV(entries []LogEntryAdapter, outputPath string) error {
 
 	// Write rows
 	for _, entry := range entries {
-		row := []string{time.UnixMilli(entry.Timestamp).Format("2006-01-02 15:04:05.000")}
+		row := []string{time.Unix(entry.Timestamp, 0).Format("2006-01-02 15:04:05")}
 		for _, key := range keys {
 			row = append(row, entry.Content[key])
 		}

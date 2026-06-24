@@ -3,7 +3,6 @@ package aliyun
 import (
 	"cloud-manage/provider"
 	"fmt"
-	"time"
 
 	openapi "github.com/alibabacloud-go/darabonba-openapi/v2/client"
 	sls "github.com/alibabacloud-go/sls-20201230/v2/client"
@@ -86,14 +85,21 @@ func (p *SLSProvider) GetLogs(project, logstore, query string, from, to int64, m
 	entries := make([]provider.LogEntry, 0)
 	for _, log := range body {
 		entry := provider.LogEntry{
-			Timestamp: time.Now().UnixMilli(),
-			Content:   make(map[string]string),
+			Content: make(map[string]string),
 		}
 		for k, v := range log {
 			if strVal, ok := v.(string); ok {
 				entry.Content[k] = strVal
 			} else {
 				entry.Content[k] = fmt.Sprintf("%v", v)
+			}
+		}
+		if timeVal, ok := log["__time__"]; ok {
+			switch t := timeVal.(type) {
+			case float64:
+				entry.Timestamp = int64(t)
+			case int64:
+				entry.Timestamp = t
 			}
 		}
 		entries = append(entries, entry)
