@@ -534,12 +534,6 @@ func (a *App) QuerySLSLogs(accessKeyId, accessKeySecret, region, project, logsto
 	}
 }
 
-// SLSStreamResult is the response type for streaming SLS queries.
-type SLSStreamResult struct {
-	Success bool   `json:"success"`
-	Message string `json:"message"`
-}
-
 // QuerySLSLogsStream queries logs with progress events.
 // Uses Wails runtime events to send progress updates to the frontend.
 func (a *App) QuerySLSLogsStream(accessKeyId, accessKeySecret, region, project, logstore, query string, from, to int64, maxLines int64) SLSLogQueryResult {
