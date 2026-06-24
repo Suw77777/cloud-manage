@@ -81,9 +81,19 @@ go build -o cloud-manage .
 ### CLI 模式（推荐用于服务器/无 GUI 环境）
 
 ```bash
-# 配置凭证
+# 方式一：通过环境变量配置凭证（推荐）
 export CLOUD_ACCESS_KEY_ID=your-key-id
 export CLOUD_ACCESS_KEY_SECRET=your-key-secret
+./cloud-manage ecs list
+
+# 方式二：通过 flag 传入凭证（flag 必须放在子命令前面）
+./cloud-manage -id your-key-id -secret your-key-secret ecs list
+./cloud-manage -id your-key-id -secret your-key-secret -region cn-beijing vpc list
+
+# 方式三：通过配置文件（需先初始化）
+./cloud-manage config init              # 初始化配置文件
+./cloud-manage config add prod --save   # 添加账号（加密保存凭证）
+./cloud-manage -profile prod ecs list   # 使用指定账号
 
 # ECS 实例管理
 ./cloud-manage ecs list
@@ -91,14 +101,14 @@ export CLOUD_ACCESS_KEY_SECRET=your-key-secret
 ./cloud-manage ecs start i-xxx
 ./cloud-manage ecs stop i-xxx [--force]
 
-# 云监控（分步查询）
-./cloud-manage cms products          # 列出支持的云产品
-./cloud-manage cms metrics ecs       # 列出 ECS 实例
-./cloud-manage cms metrics i-xxx      # 查询实例监控数据
+# 云监控
+./cloud-manage cms products             # 列出支持的云产品
+./cloud-manage cms metrics i-xxx        # 查询实例监控数据
 
 # 日志服务
 ./cloud-manage sls logstores <project>
 ./cloud-manage sls logs <project> <logstore> --query "level: ERROR"
+./cloud-manage sls export <project> <logstore> --format csv --output logs.csv
 
 # 对象存储
 ./cloud-manage oss buckets
@@ -113,6 +123,9 @@ export CLOUD_ACCESS_KEY_SECRET=your-key-secret
 ./cloud-manage slb list
 ./cloud-manage slb detail <slb-id>
 ./cloud-manage slb listeners <slb-id>
+
+# JSON 格式输出
+./cloud-manage -json ecs list
 ```
 
 ### AppImage 模式
@@ -124,12 +137,40 @@ export CLOUD_ACCESS_KEY_SECRET=your-key-secret
 
 ## 通用参数
 
+> **重要**: 所有 flag 参数必须放在子命令**之前**，否则会被忽略。
+
+```bash
+# 正确 - flag 在子命令前面
+./cloud-manage -id xxx -secret xxx -region cn-shanghai ecs list
+./cloud-manage -json -region cn-beijing vpc list
+
+# 错误 - flag 在子命令后面，会被忽略
+./cloud-manage ecs list -id xxx -secret xxx
+```
+
+### 全局参数
+
 | 参数 | 说明 | 默认值 |
 |------|------|--------|
 | `-id` | AccessKey ID | 环境变量 `CLOUD_ACCESS_KEY_ID` |
 | `-secret` | AccessKey Secret | 环境变量 `CLOUD_ACCESS_KEY_SECRET` |
 | `-region` | 地域 | `cn-hangzhou` |
-| `-json` | JSON 输出 | `false` |
+| `-json` | JSON 格式输出 | `false` |
+| `-profile` | 使用指定配置账号 | 配置文件中的 `current_profile` |
+
+### 模式参数
+
+| 参数 | 说明 |
+|------|------|
+| `--gui` | 强制 GUI 模式（需要图形环境） |
+| `--tui` | 强制 TUI 模式（终端界面） |
+| `--cli` | 强制 CLI 模式 |
+
+> 不带模式参数时自动检测：有图形环境启动 GUI，检测到子命令进入 CLI，否则进入 TUI。
+
+### 参数优先级
+
+命令行参数 > 环境变量 > `--profile` 指定的配置 > `current_profile` 配置 > 默认值
 
 ## 支持的服务
 
