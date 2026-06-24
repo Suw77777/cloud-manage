@@ -9,6 +9,7 @@
 coverage.html
 cloud-cli
 cloud-manage
+cloud-manage-*
 
 # Wails
 build/
